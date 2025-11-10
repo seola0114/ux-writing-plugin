@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>UX Writing Lint – Modal/Toast Helper</title>
+<style>
+  :root{
+    --bg:#fff; --text:#16171B; --muted:#6B7380;
+    --border:#E6E8EB; --blue:#0B5FFF; --blue-bg:#E8F1FF;
+    --green:#0E9F6E; --red:#D80027; --red-bg:#FFECEC;
+    --chip:#EEF2FF;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text); font:14px/1.5 "SUIT Variable",system-ui,-apple-system,sans-serif;}
+  header{ padding:10px 16px; font-weight:700; border-bottom:1px solid var(--border); }
+  .tabs{ display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid var(--border); }
+  .tab{ border:none; background:none; padding:6px 10px; border-radius:8px; cursor:pointer; color:var(--muted); font-weight:600; }
+  .tab.active{ color:var(--blue); background:var(--blue-bg); }
+  section{ padding:14px 16px; }
+  .row{ display:flex; gap:12px; align-items:center; }
+  .btn{ border:none; background:var(--blue); color:#fff; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+  .btn.secondary{ background:#EDF2F7; color:#1A202C; }
+  .muted{ color:var(--muted); font-size:12px; }
+  textarea,input{ width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font:14px/1.5 inherit; }
+  .box{ border:1px solid var(--border); border-radius:12px; padding:12px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .chip{ display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; margin-right:8px; }
+  .chip.confirm{ background:var(--blue-bg); color:var(--blue); }
+  .chip.delete{ background:var(--red-bg); color:var(--red); }
+  .table{ width:100%; border-collapse:collapse; }
+  .table th,.table td{ border-bottom:1px solid var(--border); padding:8px 6px; text-align:left; }
+  .right{ text-align:right; }
+  .hidden{ display:none; }
+  .note{ background:#F8FAFF; border:1px dashed var(--border); padding:8px 10px; border-radius:8px; font-size:12px; color:#394150; }
+</style>
+</head>
+<body>
+  <header>UX Writing Lint – Modal/Toast Helper</header>
+  <div class="tabs">
+    <button id="tab-an" class="tab active">변환 제안</button>
+    <button id="tab-free" class="tab">자유 입력</button>
+  </div>
+
+  <!-- 변환 제안(선택 분석) -->
+  <section id="panel-an">
+    <div class="row" style="justify-content:space-between;">
+      <div class="row">
+        <button class="btn secondary" id="btnAnalyze">선택 분석</button>
+        <span class="muted" id="progress"></span>
+      </div>
+      <div>
+        <button class="btn" id="btnApply">선택 항목 적용</button>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:12px;">
+      <div class="row" style="align-items:center; gap:8px;">
+        <span id="recChip" class="chip confirm">Confirm Modal</span>
+        <span id="recDesc" class="muted">확인이 필요한 모달입니다.</span>
+      </div>
+
+      <div class="grid2" style="margin-top:12px;">
+        <div>
+          <div class="muted">Preview</div>
+          <input id="pTitle" placeholder="타이틀" />
+          <input id="pDesc" placeholder="설명" style="margin-top:8px;" />
+        </div>
+        <div>
+          <div class="muted">Buttons</div>
+          <div class="grid2">
+            <input id="pLeft" placeholder="Left (없으면 빈칸)" />
+            <input id="pRight" placeholder="Right" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:12px;">
+      <table class="table" id="lintTable">
+        <thead>
+          <tr>
+            <th style="width:28px;"><input type="checkbox" id="chkAll"></th>
+            <th>항목</th>
+            <th>원본</th>
+            <th>제안</th>
+            <th>사유</th>
+          </tr>
+        </thead>
+        <tbody id="lintBody"></tbody>
+      </table>
+      <div class="note" style="margin-top:8px;">체크한 항목만 적용됩니다.</div>
+    </div>
+  </section>
+
+  <!-- 자유 입력 -->
+  <section id="panel-free" class="hidden">
+    <div class="box">
+      <div class="muted">상황/문장 입력</div>
+      <textarea id="freeText" placeholder='예) "화주와 청구고객이 동일해 청구고객변경 결재가 필요없음을 알리고 싶다"'></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button id="btnFree" class="btn">추천 받기</button>
+      </div>
+    </div>
+
+    <div id="freeResult" class="box hidden" style="margin-top:12px;">
+      <div id="freeChip" class="chip confirm">Confirm Modal</div>
+      <div class="muted" id="freeGuide">확인이 필요한 모달입니다.</div>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <div class="muted">Title</div>
+          <input id="freeTitle">
+        </div>
+        <div>
+          <div class="muted">Description</div>
+          <input id="freeDesc">
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <div class="muted">Left button</div>
+          <input id="freeLeft" value="취소">
+        </div>
+        <div>
+          <div class="muted">Right button</div>
+          <input id="freeRight" value="확인">
+        </div>
+      </div>
+      <div class="muted" id="freeReasons" style="margin-top:8px;"></div>
+    </div>
+  </section>
+
+<script>
+  var tabAn = document.getElementById("tab-an");
+  var tabFree = document.getElementById("tab-free");
+  var panelAn = document.getElementById("panel-an");
+  var panelFree = document.getElementById("panel-free");
+
+  tabAn.onclick = function(){
+    tabAn.classList.add("active"); tabFree.classList.remove("active");
+    panelAn.classList.remove("hidden"); panelFree.classList.add("hidden");
+  };
+  tabFree.onclick = function(){
+    tabFree.classList.add("active"); tabAn.classList.remove("active");
+    panelFree.classList.remove("hidden"); panelAn.classList.add("hidden");
+  };
+
+  // 분석/미리보기 엘리먼트
+  var btnAnalyze = document.getElementById("btnAnalyze");
+  var progressEl = document.getElementById("progress");
+  var recChip = document.getElementById("recChip");
+  var recDesc = document.getElementById("recDesc");
+  var pTitle = document.getElementById("pTitle");
+  var pDesc  = document.getElementById("pDesc");
+  var pLeft  = document.getElementById("pLeft");
+  var pRight = document.getElementById("pRight");
+  var lintBody = document.getElementById("lintBody");
+  var chkAll = document.getElementById("chkAll");
+  var btnApply = document.getElementById("btnApply");
+
+  btnAnalyze.onclick = function(){
+    progressEl.textContent = "선택 영역 분석 중...";
+    parent.postMessage({ pluginMessage:{ type:"analyze-selected" } }, "*");
+  };
+
+  chkAll.onclick = function(){
+    var inputs = lintBody.querySelectorAll('input[type="checkbox"]');
+    for(var i=0;i<inputs.length;i++){ inputs[i].checked = chkAll.checked; }
+  };
+
+  btnApply.onclick = function(){
+    var rows = lintBody.querySelectorAll("tr");
+    var apply=[];
+    for(var i=0;i<rows.length;i++){
+      var r=rows[i];
+      var cb = r.querySelector('input[type="checkbox"]');
+      if(cb && cb.checked){
+        var name = r.getAttribute("data-name");
+        var val  = r.querySelector('input[type="text"]').value;
+        apply.push({ name:name, text:val });
+      }
+    }
+    parent.postMessage({ pluginMessage:{ type:"apply", apply:apply } }, "*");
+  };
+
+  // 자유 입력
+  var freeText   = document.getElementById("freeText");
+  var btnFree    = document.getElementById("btnFree");
+  var freeResult = document.getElementById("freeResult");
+  var freeChip   = document.getElementById("freeChip");
+  var freeGuide  = document.getElementById("freeGuide");
+  var freeTitle  = document.getElementById("freeTitle");
+  var freeDesc   = document.getElementById("freeDesc");
+  var freeLeft   = document.getElementById("freeLeft");
+  var freeRight  = document.getElementById("freeRight");
+  var freeReasons= document.getElementById("freeReasons");
+
+  btnFree.onclick = function(){
+    parent.postMessage({ pluginMessage:{ type:"free-input", text: freeText.value } }, "*");
+  };
+
+  // Plugin → UI
+  window.onmessage = function(e){
+    var msg = e.data.pluginMessage;
+    if(!msg) return;
+
+    if(msg.type==="progress"){
+      progressEl.textContent = msg.text || "";
+      return;
+    }
+
+    if(msg.type==="analysis"){
+      progressEl.textContent = msg.error ? msg.error : "분석 완료";
+      // chip
+      var comp = msg.recommendation || "confirm";
+      setChip(recChip, comp);
+      recDesc.textContent = (comp==="delete") ? "중요한 파괴적 작업입니다." : "확인이 필요한 모달입니다.";
+      // preview
+      if(msg.preview){
+        pTitle.value = msg.preview.title || "";
+        pDesc.value  = msg.preview.description || "";
+        pLeft.value  = msg.preview.leftLabel || "";
+        pRight.value = msg.preview.rightLabel || "확인";
+      }
+      // lint rows
+      lintBody.innerHTML = "";
+      var items = msg.items || [];
+      for(var i=0;i<items.length;i++){
+        var it = items[i];
+        var tr = document.createElement("tr");
+        tr.setAttribute("data-name", it.name);
+        tr.innerHTML =
+          '<td><input type="checkbox"/></td>'+
+          '<td>'+esc(it.name)+'</td>'+
+          '<td>'+esc(it.original||"")+'</td>'+
+          '<td><input type="text" value="'+escAttr(it.suggested||"")+'"/></td>'+
+          '<td class="muted">'+esc(it.reason||"")+'</td>';
+        lintBody.appendChild(tr);
+      }
+      return;
+    }
+
+    if(msg.type==="applied"){
+      progressEl.textContent = "적용 완료: "+(msg.count||0)+"건";
+      return;
+    }
+
+    if(msg.type==="free-result"){
+      freeResult.classList.remove("hidden");
+      var comp = msg.component || "confirm";
+      setChip(freeChip, comp);
+      freeGuide.textContent = (comp==="delete")?'중요한 파괴적 작업입니다.':'확인이 필요한 모달입니다.';
+      freeTitle.value = msg.title||"";
+      freeDesc.value  = msg.description||"";
+      freeLeft.value  = msg.left||"취소";
+      freeRight.value = msg.right||"확인";
+      var rs = msg.reasons || [];
+      freeReasons.textContent = "• " + rs.join(" · ");
+      return;
+    }
+  };
+
+  function setChip(el, comp){
+    el.textContent = (comp==="delete") ? "Delete Modal" : "Confirm Modal";
+    el.classList.remove("delete","confirm");
+    el.classList.add(comp==="delete"?"delete":"confirm");
+  }
+  function esc(s){ return (s||"").replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+  function escAttr(s){ return esc(s).replace(/"/g,"&quot;"); }
+</script>
+</body>
+</html>
