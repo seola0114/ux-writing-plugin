@@ -388,5 +388,60 @@ figma.ui.onmessage = function(msg){
   }
 };
 
+// --- 최소 폴백 로직 (요약 버전)
+function _nz(s){return (s||"").replace(/\s+/g," ").trim();}
+function _sentencesKo(s){s=_nz(s); if(!s) return 0; var m=s.match(/(?:다|요)\.|[\.!?…]+/g); return m?m.length:1;}
+function _has(s,re){return re.test(_nz(s));}
+function _isDestr(s){return _has(s,/(삭제|제거|폐기|초기화|되돌릴\s*수\s*없|취소\s*처리)/);}
+function _needsAct(s){return _has(s,/(확정|변경|결재|승인|저장|다시\s*시도|입력|선택|진행|전송|삭제하시겠|하시겠어요)/);}
+function _tooLong(s){s=_nz(s);return s.length>80||_sentencesKo(s)>=2;}
+
+function localClassify(s){
+  s=_nz(s);
+  if(_isDestr(s)) return {type:'delete', reasons:['파괴적 작업 키워드 감지']};
+  if(_tooLong(s)||_needsAct(s)) return {type:_needsAct(s)?'confirm-2btn':'confirm-1btn', reasons:['토스트로 담기엔 길거나 의사결정 필요']};
+  if(_has(s,/(유의|주의|제한|필수|누락|불가|오류|경고|실패)/)) return {type:'toast-caution', reasons:['주의/안내 성격']};
+  return {type:'toast-success', reasons:['짧은 결과 피드백']};
+}
+function localSuggest(t,s){
+  var r={title:'',desc:'',left:'',right:'',rightStyle:'neutral'};
+  if(t==='delete'){r={title:'삭제하시겠어요?',desc:'이 작업은 되돌릴 수 없습니다.',left:'취소',right:'삭제',rightStyle:'danger'};}
+  else if(t==='confirm-2btn'){r={title:'계속 진행하시겠어요?',desc:'해당 작업을 진행하면 설정이 변경됩니다.',left:'취소',right:'확인',rightStyle:'primary'};}
+  else if(t==='confirm-1btn'){r={title:'안내 드립니다.',desc:'규칙에 따라 해당 절차는 생략됩니다.',left:'',right:'확인',rightStyle:'primary'};}
+  else if(t==='toast-caution'){r={title:'',desc:'필수 항목을 확인해 주세요.',left:'',right:'',rightStyle:'neutral'};}
+  else {r={title:'',desc:'처리가 완료되었습니다.',left:'',right:'',rightStyle:'neutral'};}
+  if(/청구고객|결재/.test(_nz(s))&&(t==='confirm-1btn'||t==='confirm-2btn')){
+    r.title='청구고객 변경 결재가 필요하지 않습니다.';
+    r.desc='화주와 청구고객이 동일하여 결재 절차 없이 바로 청구확정할 수 있습니다.';
+    r.left=(t==='confirm-2btn')?'취소':'';
+    r.right='확인'; r.rightStyle='primary';
+  }
+  if(_isDestr(s)){ if(/취소/.test(s)){r.title='취소 처리하시겠어요?'; r.right='취소 처리';} r.rightStyle='danger'; }
+  return r;
+}
+
+// ---- 로컬 폴백 와이어링 (수정 버전)
+let __LOCAL_WIRED__ = false; // <-- figma에 붙이지 말고 모듈 변수로
+
+if (typeof figma !== 'undefined' && figma.ui && !__LOCAL_WIRED__) {
+  __LOCAL_WIRED__ = true;
+
+  const prev = figma.ui.onmessage;
+  figma.ui.onmessage = function (msg) {
+    if (prev) prev.call(figma.ui, msg);
+
+    if (msg && msg.type === 'LOCAL_RECO') {
+      const s = msg.situation || '';
+      const c = localClassify(s);
+      const sug = localSuggest(c.type, s);
+      figma.ui.postMessage({
+        type: 'LOCAL_RECO_RESULT',
+        payload: { type: c.type, reasons: c.reasons, suggest: sug }
+      });
+    }
+    // APPLY_FIELDS 등 기존 핸들러 로직은 그대로 유지
+  };
+}
+
 // =============== Show UI ===============
 figma.showUI(__html__, { width: 860, height: 680 });

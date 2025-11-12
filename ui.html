@@ -313,5 +313,175 @@
   };
 })();
 </script>
+<!-- 상황 입력 + 키 입력 -->
+<div style="display:flex; gap:8px; align-items:center">
+  <input id="geminiKey" type="password" placeholder="Gemini API Key" style="width:260px">
+  <button id="saveKey">키 저장</button>
+</div>
+<textarea id="situation" rows="3" style="width:100%;margin-top:8px"
+  placeholder="상황을 적어주세요 (예: 화주와 청구고객이 동일해서 '청구고객변경 결재'가 필요 없음)"></textarea>
+<div style="margin-top:8px; display:flex; gap:8px">
+  <button id="btnGemini">추천 받기(Gemini)</button>
+  <button id="btnLocal">오프라인 추천(폴백)</button>
+</div>
+
+<!-- 결과 표시 -->
+<div style="margin:12px 0">
+  <b>추천 유형:</b> <span id="reco-type">-</span>
+  <ul id="reco-reasons"></ul>
+</div>
+
+<!-- 제안 카피 -->
+<div style="display:grid; grid-template-columns:140px 1fr; gap:6px; align-items:center">
+  <label>제목</label>        <input id="sug-title"  />
+  <label>Description</label> <input id="sug-desc"   />
+  <label>왼쪽 버튼</label>   <input id="sug-left"   />
+  <label>오른쪽 버튼</label> <input id="sug-right"  />
+  <div></div><small id="sug-right-style"></small>
+</div>
+<button id="apply">선택 항목에 적용</button>
+
+<script>
+const $ = s=>document.querySelector(s);
+const list = (id, arr)=>{ const ul=document.getElementById(id); ul.innerHTML='';
+  (arr||[]).forEach(t=>{ const li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
+};
+
+// 키 저장/로드
+(function initKey(){
+  const k = localStorage.getItem('gemini_api_key')||'';
+  if(k) $('#geminiKey').value = k;
+})();
+$('#saveKey').onclick = ()=>{ localStorage.setItem('gemini_api_key', $('#geminiKey').value.trim()); alert('저장됨'); };
+
+// 결과 그리기
+function renderResult(p){
+  document.getElementById('reco-type').textContent = p.type || '-';
+  list('reco-reasons', p.reasons||[]);
+  $('#sug-title').value  = (p.suggest && p.suggest.title)  || '';
+  $('#sug-desc').value   = (p.suggest && p.suggest.desc)   || '';
+  $('#sug-left').value   = (p.suggest && p.suggest.left)   || '';
+  $('#sug-right').value  = (p.suggest && p.suggest.right)  || '';
+  document.getElementById('sug-right-style').textContent =
+    p.suggest && p.suggest.rightStyle ? ('오른쪽 버튼 스타일: ' + p.suggest.rightStyle) : '';
+}
+
+// 로컬 폴백(이전 대화에서 주던 간단 규칙 버전)
+function localFallback(situation){
+  parent.postMessage({ pluginMessage:{ type:'LOCAL_RECO', situation:situation } }, '*');
+}
+
+$('#btnLocal').onclick = ()=>{
+  const s = $('#situation').value.trim();
+  if(!s) return alert('상황을 입력하세요');
+  localFallback(s);
+};
+
+// Gemini 호출
+$('#btnGemini').onclick = async ()=>{
+  const s = $('#situation').value.trim();
+  if(!s) return alert('상황을 입력하세요');
+  const key = ($('#geminiKey').value||localStorage.getItem('gemini_api_key')||'').trim();
+  if(!key) return alert('Gemini API 키를 입력/저장하세요');
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`;
+
+  // 모델이 반드시 JSON으로 답하도록 요청
+  const body = {
+    generationConfig: { response_mime_type: "application/json" },
+    contents: [{
+      role: "user",
+      parts: [{
+        text:
+`너는 UX 라이터 도우미야. 아래 '상황'을 읽고 토스트/모달 중 가장 적합한 유형을 추천하고,
+제목/설명/버튼 텍스트를 한국어로 제안해.
+규칙:
+- 파괴적 작업(삭제/취소/되돌릴 수 없음)은 Delete Modal + 빨간 버튼.
+- 사용자의 결정/확인이 필요하거나 80자 초과/문장 2개 이상이면 Confirm Modal.
+- 한 문장 내 결과 피드백은 Toast Success.
+- 조건/유의/안내는 Toast Caution.
+반환은 반드시 JSON:
+{
+  "type": "delete|confirm-2btn|confirm-1btn|toast-success|toast-caution",
+  "reasons": ["..."],
+  "suggest": { "title":"", "desc":"", "left":"", "right":"", "rightStyle":"danger|primary|neutral" }
+}
+상황: ${s}`
+      }]
+    }]
+  };
+
+  try{
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if(!res.ok){ throw new Error('HTTP '+res.status); }
+    const data = await res.json();
+    // v1beta generateContent 응답 파싱
+    const text = (((data||{}).candidates||[])[0]||{}).content?.parts?.[0]?.text || '';
+    const parsed = JSON.parse(text);        // 모델이 준 JSON
+    renderResult(parsed);
+  }catch(e){
+    console.error('Gemini error', e);
+    alert('Gemini 호출 실패 → 로컬 규칙으로 대체합니다.');
+    localFallback(s);
+  }
+}
+
+// Figma → UI 메시지 수신(로컬 폴백 결과)
+window.onmessage = (e)=>{
+  const msg = e.data && e.data.pluginMessage;
+  if(!msg) return;
+  if(msg.type === 'LOCAL_RECO_RESULT'){
+    renderResult(msg.payload||{});
+  }
+};
+
+// 적용
+$('#apply').onclick = ()=>{
+  parent.postMessage({ pluginMessage:{
+    type:'APPLY_FIELDS',
+    apply:{ title:true, desc:true, left:true, right:true },
+    values:{
+      title: $('#sug-title').value||'',
+      desc:  $('#sug-desc').value||'',
+      left:  $('#sug-left').value||'',
+      right: $('#sug-right').value||''
+    }
+  }}, '*');
+};
+const WORKER_URL = 'https://late-rain-59eb.seola-kim.workers.dev/';
+
+async function askAI(situationText) {
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // 서버/워커 모두 JSON 기대
+      body: JSON.stringify({ text: situationText })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();   // <— 반드시 JSON
+    // { type, reasons[], suggestion:{title,description,left,right} } 형태 기대
+    return data;
+  } catch (e) {
+    // 패널에 에러 표시
+    console.error(e);
+    showAiError('추천을 불러오는 중 오류가 발생했습니다. ' + (e.message || 'Failed to fetch'));
+    return null;
+  }
+}
+
+// 예시: 버튼 클릭 시 호출
+document.getElementById('btn-ai-reco').addEventListener('click', async () => {
+  const situation = document.getElementById('free-input').value.trim();
+  if (!situation) return;
+  setAiLoading(true);
+  const result = await askAI(situation);
+  setAiLoading(false);
+  if (result) {
+    renderAiRecommendation(result); // 패널에 유형/사유/제안 타이틀/설명/버튼명 뿌리는 함수
+  }
+});
+
+</script>
 </body>
 </html>
