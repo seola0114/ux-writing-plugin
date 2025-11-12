@@ -1,349 +1,392 @@
-// ===== UX Writing Lint – Modal/Toast Helper (Full) =====
-// - No optional chaining (Figma validator 우회)
-// - GAS 호출은 text/plain으로 프리플라이트 회피
-// - Caution/Info는 Confirm으로 강제, Right 기본값은 "확인"
-
-var SERVER_URL = "https://script.google.com/macros/s/AKfycbwStqaWb2FsmG3DW9YhSRfpZbVoWMrc0e6nwsO8v4S_NywFd1y5Xw68OKPDs6opbWGe/exec";
-
-figma.showUI(__html__, { width: 720, height: 680 });
-
-/* ===================== 유틸 ===================== */
-function isText(n){ return n && n.type === "TEXT"; }
-function visible(n){ return !n || n.visible !== false; }
-function nameOf(n){ return (n && n.name) ? n.name : ""; }
-function lower(s){ return (s || "").toLowerCase(); }
-function isFrameLike(n){
-  if(!n) return false;
-  var t = n.type;
-  return t==="FRAME"||t==="GROUP"||t==="COMPONENT"||t==="INSTANCE"||t==="SECTION"||t==="COMPONENT_SET"||t==="PAGE";
-}
-function collectAll(n, arr){
-  if(!n) return;
-  arr.push(n);
-  if(n.children){
-    for(var i=0;i<n.children.length;i++){ collectAll(n.children[i], arr); }
+// =============== Utility ===============
+function findTextByParentNames(node, keywords){ // ['title','description','설명' ...]
+  var result = null;
+  if (!node || !node.children) return result;
+  for (var i=0;i<node.children.length;i++){
+    var c = node.children[i];
+    var nm = (c.name || '').toLowerCase();
+    for (var k=0;k<keywords.length;k++){
+      if (c.type === 'TEXT' && nm.indexOf(keywords[k]) >= 0) return c;
+      if (!result && nm.indexOf(keywords[k]) >= 0){
+        result = findFirstText(c);
+        if (result) return result;
+      }
+    }
   }
+  return result;
 }
-function collectTextNodes(root, out){
-  if(!root) return;
-  if(isText(root) && visible(root)) out.push(root);
-  if(root.children){
-    for(var i=0;i<root.children.length;i++){ collectTextNodes(root.children[i], out); }
-  }
+// single-name 호환용(기존 코드에서 호출)
+function findTextByParentName(node, keyword){
+  return findTextByParentNames(node, [String(keyword||'').toLowerCase()]);
 }
-function findFirst(root, testFn){
-  var all = []; collectAll(root, all);
-  for(var i=0;i<all.length;i++){
-    if(testFn(all[i])) return all[i];
+function findFirstText(node){
+  if (!node) return null;
+  if (node.type === 'TEXT') return node;
+  if (!node.children) return null;
+  for (var i=0; i<node.children.length; i++){
+    var f = findFirstText(node.children[i]);
+    if (f) return f;
   }
   return null;
 }
-
-/* ===================== 구조 추출 ===================== */
-function extractModalFields(container){
-  var f = {
-    title: null,
-    where: null,
-    description: null,
-    leftButton: { node:null, label:"", hidden:true },
-    rightButton:{ node:null, label:"", hidden:true }
-  };
-
-  // 1) 이름 기반 탐색 (레이어 네임을 신뢰)
-  var titleNode = findFirst(container, function(n){
-    if(!isText(n)) return false;
-    var pn = lower(nameOf(n.parent));
-    var nn = lower(nameOf(n));
-    return pn==="modal_title" || nn==="title" || nn==="modal_title";
-  });
-  if(titleNode) f.title = titleNode;
-
-  var whereNode = findFirst(container, function(n){
-    if(!isText(n)) return false;
-    var nn = (n.characters||"").trim();
-    return /[0-9]+행/.test(nn);
-  });
-  if(whereNode) f.where = whereNode;
-
-  var descNode = null;
-  // 우선 text 그룹/Description 명칭
-  descNode = findFirst(container, function(n){
-    if(!isText(n)) return false;
-    var pn = lower(nameOf(n.parent));
-    var nn = lower(nameOf(n));
-    if(pn==="text" || pn==="description" || nn==="description") return true;
-    return false;
-  });
-  // 못 찾으면 Title 제외한 다음 텍스트를 Description로 추정
-  if(!descNode){
-    var texts=[]; collectTextNodes(container, texts);
-    var cands=[];
-    for(var i=0;i<texts.length;i++){
-      var t=texts[i];
-      if(titleNode && t===titleNode) continue;
-      var tx=(t.characters||"").trim();
-      if(tx.length>0) cands.push({n:t,y:t.y});
-    }
-    if(cands.length>0){
-      // y 오름차순
-      cands.sort(function(a,b){ return (a.y||0)-(b.y||0); });
-      descNode = cands[0].n;
-    }
-  }
-  if(descNode) f.description = descNode;
-
-  // 2) 버튼 탐색 (modal_button 아래 Buttons 그룹)
-  var buttonRoot = null;
-  if(container && container.children){
-    for(var i=0;i<container.children.length;i++){
-      if(lower(nameOf(container.children[i]))==="modal_button"){
-        buttonRoot = container.children[i]; break;
-      }
-    }
-  }
-  function grabFirstText(node){
-    if(!node) return null;
-    var tnode = findFirst(node, function(n){ return isText(n) && visible(n); });
-    return tnode;
-  }
-
-  if(buttonRoot && buttonRoot.children && buttonRoot.children.length){
-    var groups=[];
-    for(var j=0;j<buttonRoot.children.length;j++){
-      if(lower(nameOf(buttonRoot.children[j]))==="buttons"){
-        groups.push(buttonRoot.children[j]);
-      }
-    }
-    if(groups.length===1){
-      // 단일 버튼 → Right로 간주
-      var r = grabFirstText(groups[0]);
-      if(r){
-        f.rightButton.node = r;
-        f.rightButton.label = r.characters||"";
-        f.rightButton.hidden = !visible(r);
-      }
-    }else if(groups.length>=2){
-      var l = grabFirstText(groups[0]);
-      if(l){
-        f.leftButton.node = l;
-        f.leftButton.label = l.characters||"";
-        f.leftButton.hidden = !visible(l);
-      }
-      var r2 = grabFirstText(groups[1]);
-      if(r2){
-        f.rightButton.node = r2;
-        f.rightButton.label = r2.characters||"";
-        f.rightButton.hidden = !visible(r2);
-      }
-    }
-  }else{
-    // fallback: 텍스트 중 '취소'와 '확인' 가장 오른쪽 라벨을 버튼으로 추정
-    var texts=[]; collectTextNodes(container, texts);
-    var rightCandidate=null, leftCandidate=null;
-    for(var k=0;k<texts.length;k++){
-      var tx=(texts[k].characters||"").trim();
-      if(tx==="확인"){
-        if(!rightCandidate || texts[k].x > rightCandidate.x) rightCandidate=texts[k];
-      }
-      if(tx==="취소"){
-        if(!leftCandidate || texts[k].x < leftCandidate.x) leftCandidate=texts[k];
-      }
-    }
-    if(rightCandidate){
-      f.rightButton.node=rightCandidate;
-      f.rightButton.label=rightCandidate.characters||"";
-      f.rightButton.hidden=!visible(rightCandidate);
-    }
-    if(leftCandidate){
-      f.leftButton.node=leftCandidate;
-      f.leftButton.label=leftCandidate.characters||"";
-      f.leftButton.hidden=!visible(leftCandidate);
-    }
-  }
-
-  return f;
+function getText(node){
+  try { return node && node.characters ? String(node.characters).trim() : ''; }
+  catch(e){ return ''; }
 }
-
-/* ===================== 로컬 Lint & 추천 ===================== */
-function localLint(f){
-  var items=[];
-  function add(name,o,s,reason,bad){ items.push({name:name,original:o,suggested:s,reason:reason,bad:bad}); }
-
-  if(f.title){
-    var t=f.title.characters||"";
-    var tBad = t && !/[.!?？!]$/.test(t);
-    add("Title", t, tBad ? (t+".") : t, tBad?"문장형은 마침표":"", tBad);
+function colorToHex(fill){
+  try{
+    if (!fill || fill.type !== 'SOLID') return '';
+    var r = Math.round((fill.color.r||0)*255);
+    var g = Math.round((fill.color.g||0)*255);
+    var b = Math.round((fill.color.b||0)*255);
+    function h(n){ var s = n.toString(16); return (s.length===1?'0':'')+s; }
+    return '#'+h(r)+h(g)+h(b);
+  }catch(e){ return ''; }
+}
+function getRightButtonFillInfo(btnTextNode){
+  var parent = btnTextNode ? btnTextNode.parent : null;
+  var hex = '', styleName = '';
+  if (parent && parent.fills && parent.fills.length){
+    hex = colorToHex(parent.fills[0]);
   }
-  if(f.description){
-    var d=f.description.characters||"";
-    var dBad = d && !/[.!?？!]$/.test(d) && !/[:,\n]/.test(d);
-    add("Description", d, dBad ? (d+".") : d, dBad?"문장형은 마침표":"", dBad);
-  }
-  if(f.leftButton.hidden){ add("Left button","없음","없음","",false); }
-  else { add("Left button", f.leftButton.label, f.leftButton.label, "", false); }
-
-  // Right 버튼 없으면 기본 '확인'
-  if(f.rightButton.node){ add("Right button", f.rightButton.label, f.rightButton.label, "", false); }
-  else { add("Right button","확인","확인","기본값",false); }
-
-  return items;
-}
-
-// 주의/정보(불가/실패/주의/없습니다/재시도 등)는 Confirm으로 강제
-function decideRec(f){
-  var t=(f.title && f.title.characters)?f.title.characters:"";
-  var hasLeft = f.leftButton && !f.leftButton.hidden && f.leftButton.label;
-  var hasRight = f.rightButton && !f.rightButton.hidden && f.rightButton.label;
-
-  var caution = /불가|실패|주의|없습니다|할 수 없습니다|재시도|안내|정보/i.test(t);
-  if(caution) return "confirm";
-
-  if(hasLeft && hasRight && /삭제|해지|파기/i.test(t)) return "delete";
-  if(hasLeft && hasRight) return "confirm";
-  return "confirm";
-}
-
-function buildPreview(f){
-  return {
-    title: (f.title && f.title.characters)?f.title.characters:"타이틀",
-    description: (f.description && f.description.characters)?f.description.characters:"설명",
-    where: (f.where && f.where.characters)?f.where.characters:"",
-    leftLabel: (f.leftButton.hidden ? "없음" : (f.leftButton.label||"")),
-    rightLabel: (f.rightButton.label||"확인"),
-    leftHidden: !!f.leftButton.hidden
-  };
-}
-
-/* ===================== 폰트 로딩 후 적용 ===================== */
-async function loadFontsForNodes(nodes){
-  var need = [];
-  for(var i=0;i<nodes.length;i++){
-    var n=nodes[i];
-    if(!n || !isText(n)) continue;
+  if (parent && typeof parent.fillStyleId === 'string'){
     try{
-      var fn = n.fontName; // 단일 스타일 가정 (플러그인 텍스트는 대부분 단일)
-      if(fn && fn.family && fn.style){
-        var key = fn.family+"__"+fn.style;
-        need.push({family:fn.family, style:fn.style, key:key});
-      }
-    }catch(e){
-      // mixed인 경우 전체 범위 로딩 (가장 무난하게 SUIT Variable Regular/Bold/ExtraBold 시도)
-      need.push({family:"SUIT Variable", style:"Regular", key:"SUIT Variable__Regular"});
-      need.push({family:"SUIT Variable", style:"Bold", key:"SUIT Variable__Bold"});
-      need.push({family:"SUIT Variable", style:"ExtraBold", key:"SUIT Variable__ExtraBold"});
+      var st = figma.getStyleById(parent.fillStyleId);
+      if (st && st.name) styleName = st.name;
+    }catch(e){}
+  }
+  return { fill: hex, styleName: styleName };
+}
+
+// =============== Kind detection ===============
+function isDestructiveText(s){
+  if (!s) return false;
+  // ‘취소/삭제’가 제목·본문·버튼에 포함되면 파괴적 작업으로 간주(업무 규칙)
+  var kw = [
+    '삭제','제거','폐기','초기화','영구','되돌릴 수 없',
+    '취소','취소 처리','정산 취소','회계 전표 취소','삭제하시겠'
+  ];
+  s = String(s).replace(/\s+/g,'');
+  for (var i=0;i<kw.length;i++) if (s.indexOf(kw[i])>=0) return true;
+  return false;
+}
+function isAffirmativeText(s){
+  if (!s) return false;
+  return /(확인|저장|변경|적용|전송|승인|확정)/.test(String(s));
+}
+function isCancelText(s){
+  if (!s) return false;
+  return /(취소|닫기|아니요|아니오)/.test(String(s));
+}
+function guessKind(title, left, right, buttonCount, rightFill, styleName, desc){
+  var destructive =
+    isDestructiveText(title) || isDestructiveText(desc) ||
+    /삭제|제거|폐기|초기화/.test(right || '');
+
+  var dangerUI =
+    (rightFill && rightFill.toLowerCase().startsWith('#d')) ||
+    (styleName && /danger|error|red|destructive/i.test(styleName));
+
+  if (destructive){
+    return {key:'delete', label:'Delete modal', expectedButtons:2, shouldDanger:true, isDanger:dangerUI};
+  }
+  if (buttonCount <= 1){
+    return {key:'alert', label:'Alert modal', expectedButtons:1, shouldDanger:false, isDanger:dangerUI};
+  }
+  return {key:'confirm', label:'Confirm modal', expectedButtons:2, shouldDanger:false, isDanger:dangerUI};
+}
+
+// =============== Text lint ===============
+function lintText(title,desc,left,right,kindKey){
+  var items = [];
+  var sg = {title:'',desc:'',left:'',right:''};
+
+  if (!title){
+    items.push({level:'fail', message:'제목(Title)이 비어 있습니다.'});
+    sg.title = '작업을 진행하시겠어요?';
+  } else if (/[.!]$/.test(title)){
+    items.push({level:'warn', message:'제목 끝에 마침표(.)는 사용하지 않습니다.'});
+  }
+
+  if (kindKey==='delete'){
+    if (!/(되돌릴 수 없|복구|영구)/.test(String(desc||''))){
+      items.push({level:'warn', message:'파괴적 작업은 “되돌릴 수 없음” 경고 문장을 권장합니다.'});
+      if (!sg.desc) sg.desc = '이 작업은 되돌릴 수 없습니다.';
     }
   }
-  // dedup
-  var map={}; var uniq=[];
-  for(var j=0;j<need.length;j++){ if(!map[need[j].key]){ map[need[j].key]=1; uniq.push(need[j]); } }
-  for(var k=0;k<uniq.length;k++){
-    try{ await figma.loadFontAsync({family:uniq[k].family, style:uniq[k].style}); }catch(e){}
+
+  if (kindKey==='delete'){
+    if (!/(삭제|제거|폐기)/.test(String(right||''))){
+      items.push({level:'fail', message:'오른쪽 버튼은 “삭제/제거/폐기” 등 명확한 동사형을 권장합니다.'});
+      if (!sg.right) sg.right='삭제';
+    }
+    if (!isCancelText(left||'')){
+      items.push({level:'warn', message:'왼쪽 버튼은 보조 동작(취소/닫기)을 권장합니다.'});
+      if (!sg.left) sg.left='취소';
+    }
+  } else if (kindKey==='confirm'){
+    if (!isAffirmativeText(right||'')){
+      items.push({level:'warn', message:'오른쪽 버튼은 “확인/저장/변경/확정” 등 동사형을 권장합니다.'});
+      if (!sg.right) sg.right='확인';
+    }
+    if (!isCancelText(left||'')){
+      items.push({level:'warn', message:'왼쪽 버튼은 보조 동작(취소/닫기)을 권장합니다.'});
+      if (!sg.left) sg.left='취소';
+    }
+  } else { // alert
+    if (left) items.push({level:'warn', message:'Alert 유형은 보통 단일 버튼을 권장합니다.'});
+    if (!right) sg.right='확인';
   }
+
+  sg.title = sg.title || title || '';
+  sg.desc  = sg.desc  || desc  || '';
+  sg.left  = sg.left  || left  || '';
+  sg.right = sg.right || right || '';
+
+  return {items:items, suggest:sg};
 }
 
-async function applySuggestions(list){
-  var sel = figma.currentPage.selection[0];
-  if(!sel) { figma.ui.postMessage({type:"applied",count:0}); return; }
-  var f = extractModalFields(sel);
-  var pairs=[];
-  for(var i=0;i<(list||[]).length;i++){
-    var it=list[i]; var t=it.text;
-    if(it.name==="Title" && f.title){ pairs.push({node:f.title, text:t}); }
-    if(it.name==="Description" && f.description){ pairs.push({node:f.description, text:t}); }
-    if(it.name==="Left button" && f.leftButton.node){ pairs.push({node:f.leftButton.node, text:t}); }
-    if(it.name==="Right button" && f.rightButton.node){ pairs.push({node:f.rightButton.node, text:t}); }
+// =============== Toast↔Modal suitability ===============
+function normalize(str){ return String(str||'').replace(/\s+/g,' ').trim(); }
+function countSentencesKo(str){
+  str = normalize(str);
+  if (!str) return 0;
+  var m = str.match(/다\.|요\.|[\.!?…]+/g);
+  return m ? m.length : 1;
+}
+function recommendBetterKind(detected, title, desc, left, right){
+  var reasons = [];
+  var recommend = null;
+  var suggest = { title:'', desc:'', left:'', right:'' };
+
+  var t = normalize(title) + (desc ? ' ' + normalize(desc) : '');
+  var len = t.length;
+  var sc  = countSentencesKo(t);
+
+  // 기본 제안 문구 템플릿
+  var templates = {
+    'confirm': {
+      title: '작업을 진행하시겠어요?',
+      desc: '변경 내용을 저장하려면 확인을 눌러주세요.',
+      left: '취소',
+      right: '확인'
+    },
+    'delete': {
+      title: '정말 삭제하시겠어요?',
+      desc: '삭제한 내용은 되돌릴 수 없습니다.',
+      left: '취소',
+      right: '삭제'
+    },
+    'alert': {
+      title: '작업이 완료되었습니다.',
+      desc: '',
+      left: '',
+      right: '확인'
+    },
+    'toast-success': {
+      title: '',
+      desc: '작업이 완료되었습니다.',
+      left: '',
+      right: ''
+    },
+    'toast-caution': {
+      title: '',
+      desc: '입력이 필요합니다.',
+      left: '',
+      right: ''
+    }
+  };
+
+  // ① 토스트 → 모달 추천
+  if (detected && (detected.key==='toast-success' || detected.key==='toast-caution')){
+    if (sc >= 2){
+      recommend = 'confirm';
+      reasons.push('토스트는 한 문장에 적합합니다. 문장 ' + sc + '개가 감지되었습니다.');
+    }
+    if (len > 80){
+      if (!recommend) recommend = 'confirm';
+      reasons.push('토스트는 80자 이하를 권장합니다. 현재 ' + len + '자입니다.');
+    }
+    if (/(확인해 주세요|입력해 주세요|다시 시도|변경하시겠어요|저장하시겠어요|취소하시겠어요)/.test(t)){
+      if (!recommend) recommend = 'confirm';
+      reasons.push('사용자 행동 유도 문구가 포함되어 있습니다 → 모달이 더 적합합니다.');
+    }
   }
-  await loadFontsForNodes(pairs.map(function(p){return p.node;}));
-  var count=0;
-  for(var j=0;j<pairs.length;j++){
-    try{ pairs[j].node.characters = pairs[j].text; count++; }catch(e){}
+
+  // ② Confirm/Alert → Delete 모달 추천 (파괴적 작업 키워드)
+  if (detected && (detected.key==='confirm' || detected.key==='alert')){
+    if (/(삭제|제거|폐기|초기화|되돌릴 수 없)/.test(t) || /(삭제|제거|폐기|초기화)/.test(normalize(right))){
+      recommend = 'delete';
+      reasons.push('파괴적 작업 키워드가 감지되었습니다 → Delete Modal 권장.');
+    }
   }
-  figma.ui.postMessage({type:"applied",count:count});
+
+  // 추천이 없으면 기본적으로 현재 유형 유지
+  if (!recommend && detected) recommend = detected.key;
+
+  // 추천 유형에 맞는 제안 카피 채우기
+  if (templates[recommend]) suggest = templates[recommend];
+
+  return { recommend: recommend, reasons: reasons, suggest: suggest };
 }
 
-/* ===================== 선택 분석 ===================== */
-async function analyzeSelection(){
-  figma.ui.postMessage({ type:"progress", text:"선택 영역 분석 중..." });
+// =============== Selection read ===============
+function readSelection(){
+  var sel = figma.currentPage.selection && figma.currentPage.selection[0];
+  if (!sel) return null;
 
-  var sel = figma.currentPage.selection[0];
-  if(!sel || !isFrameLike(sel)){
-    figma.ui.postMessage({ type:"analysis", error:"프레임/컴포넌트를 선택해 주세요." });
-    return;
+  var titleNode = findTextByParentName(sel,'title') || findFirstText(sel);
+  var descNode  = findTextByParentNames(sel, ['description','설명']); // “설명=Description” 동치
+
+  // 버튼 컨테이너 탐색
+  var btnWrap   = null;
+  if (sel.children){
+    for (var i=0;i<sel.children.length;i++){
+      var n = sel.children[i];
+      var nm = String(n.name||'').toLowerCase();
+      if (nm.indexOf('button')>=0 || nm.indexOf('buttons')>=0){ btnWrap = n; break; }
+    }
   }
 
-  var f = extractModalFields(sel);
-  var items = localLint(f);
-  var rec = decideRec(f);
-  var preview = buildPreview(f);
+  var leftNode=null, rightNode=null, btnCount=0;
+  if (btnWrap && btnWrap.children){
+    for (var j=0;j<btnWrap.children.length;j++){
+      var t = findFirstText(btnWrap.children[j]);
+      if (t){ btnCount++; if (!leftNode) leftNode=t; else rightNode=t; }
+    }
+  } else {
+    var texts=[];
+    (function collect(node){
+      if (node.type==='TEXT') texts.push(node);
+      if (node.children) for (var k=0;k<node.children.length;k++) collect(node.children[k]);
+    })(sel);
+    texts.sort(function(a,b){ return (a.y||0)-(b.y||0); });
+    if (texts.length>=2){ leftNode = texts[texts.length-2]; rightNode = texts[texts.length-1]; btnCount=2; }
+    else if (texts.length>=1){ rightNode = texts[texts.length-1]; btnCount=1; }
+  }
 
-  // 결과 전송
+  var title = getText(titleNode);
+  var desc  = getText(descNode);
+  var left  = getText(leftNode);
+  var right = getText(rightNode);
+
+  var rightUI = getRightButtonFillInfo(rightNode);
+
+  return {
+    titleText:title, descText:desc, leftText:left, rightText:right,
+    buttonCount:btnCount,
+    style:{ rightFill:rightUI.fill, rightStyleName:rightUI.styleName },
+    nodes:{ titleNode:titleNode, descNode:descNode, leftNode:leftNode, rightNode:rightNode }
+  };
+}
+
+// =============== Post results ===============
+function buildDetectedKind(info){
+  var kind = guessKind(
+    info.titleText, info.leftText, info.rightText, info.buttonCount,
+    info.style.rightFill, info.style.rightStyleName, info.descText
+  );
+  return {
+    key: kind.key,
+    label: kind.label,
+    expectedButtons: kind.expectedButtons,
+    isDanger: kind.isDanger,
+    shouldDanger: kind.shouldDanger
+  };
+}
+function postSelectionInfo(info){
+  var kind = buildDetectedKind(info);
+  var help =
+    kind.key==='delete' ? '파괴적 작업 확인 모달입니다.' :
+    kind.key==='confirm' ? '확인이 필요한 모달입니다.' :
+    kind.key==='alert' ? '한 번에 알려주는 알림형 모달입니다.' :
+    '컴포넌트 유형을 식별했습니다.';
   figma.ui.postMessage({
-    type:"analysis",
-    preview:preview,
-    recommendation:rec,
-    items:items,
-    profile:{ scope:"선택 레이어" }
-  });
-}
-
-/* ===================== 자유 입력 (AI) ===================== */
-async function callAI(text){
-  var payload = { text: text };
-  var res = await fetch(SERVER_URL, {
-    method:"POST",
-    headers:{ "Content-Type":"text/plain" },
-    body: JSON.stringify(payload)
-  });
-  var txt = await res.text();
-  var data;
-  try{ data = JSON.parse(txt); }catch(e){ data = { error: txt||String(e) }; }
-  return data;
-}
-
-/* ===================== UI 통신 ===================== */
-figma.ui.onmessage = function(msg){
-  if(!msg || !msg.type) return;
-
-  if(msg.type==="analyze-selected"){ analyzeSelection(); return; }
-  if(msg.type==="apply"){ applySuggestions(msg.apply); return; }
-
-  if(msg.type==="free-input"){
-    var text = (msg.text||"").trim();
-    if(!text){
-      figma.ui.postMessage({
-        type:"free-result",
-        component:"confirm",
-        title:"입력 문장이 없습니다.",
-        description:"상황/문장을 입력해 주세요.",
-        left:"취소", right:"확인", reasons:["빈 입력"]
-      });
-      return;
+    type:'SELECTION_INFO',
+    payload:{
+      titleText:info.titleText, descText:info.descText, leftText:info.leftText, rightText:info.rightText,
+      buttonCount:info.buttonCount,
+      badge: kind.label, help: help,
+      style: info.style,
+      detected: kind
     }
-    callAI(text).then(function(data){
-      // caution/info라도 서버가 토스트로 줄 수 있으니 이쪽에서도 한 번 더 안전망
-      var comp = (data && data.component) ? data.component : "confirm";
-      if(/toast/i.test(comp)){ comp = "confirm"; }
-      figma.ui.postMessage({
-        type:"free-result",
-        component: comp,
-        title: (data && data.title) ? data.title : "확인이 필요한 모달입니다.",
-        description: (data && data.description) ? data.description : "입력하신 상황을 기준으로 확인이 필요합니다.",
-        left: (data && data.left) ? data.left : "취소",
-        right: (data && data.right) ? data.right : "확인",
-        reasons: (data && data.reasons) ? data.reasons : ["Apps Script 응답 · 목업"]
-      });
-    }).catch(function(e){
-      figma.ui.postMessage({
-        type:"free-result",
-        component:"confirm",
-        title:"AI 호출 실패",
-        description:"네트워크 또는 서버 오류가 발생했습니다.",
-        left:"취소", right:"확인",
-        reasons:["오류: "+e]
-      });
-    });
+  });
+}
+
+function runValidation(info){
+  var kind = guessKind(
+    info.titleText, info.leftText, info.rightText, info.buttonCount,
+    info.style.rightFill, info.style.rightStyleName, info.descText
+  );
+
+  // ① 컴포넌트 적합성
+  var comp = [];
+  if (kind.key==='delete' && !kind.isDanger){
+    comp.push({ level:'fail', message:'파괴적 작업입니다. 오른쪽 버튼에 Danger 스타일(빨간색)을 적용하고, Buttons/Destructive를 사용하세요.' });
+  }
+  if (kind.key!=='delete' && kind.isDanger){
+    comp.push({ level:'warn', message:'위험(Danger) 스타일이 필요 없는 모달입니다. 기본/강조 버튼으로 낮추세요.' });
+  }
+  if (info.buttonCount!==kind.expectedButtons){
+    comp.push({ level:'warn', message:'버튼 개수 권장값: '+kind.expectedButtons+'개 (현재 '+info.buttonCount+'개)' });
+  }
+  if (comp.length===0) comp.push({ level:'ok', message:'컴포넌트 사용이 적합합니다.' });
+
+  // ② 텍스트 검사
+  var textLint = lintText(info.titleText, info.descText, info.leftText, info.rightText, kind.key);
+
+  // ③ 더 적합한 유형 추천(토스트/모달 교차)
+  var rec = recommendBetterKind(
+    {key:kind.key, label:kind.label},
+    info.titleText, info.descText, info.leftText, info.rightText
+  );
+
+  figma.ui.postMessage({
+    type:'VALIDATION_RESULT',
+    result:{
+      kind: kind.key,
+      kindLabel: kind.label,
+      buttonCount: info.buttonCount,
+      comp: comp,
+      text: textLint.items,
+      suggest: textLint.suggest,
+      recommend: rec
+    }
+  });
+}
+
+// =============== Bridge ===============
+figma.ui.onmessage = function(msg){
+  if (!msg) return;
+
+  if (msg.type === 'REQUEST_SELECTION'){
+    var info1 = readSelection();
+    if (info1) postSelectionInfo(info1);
+  }
+  if (msg.type === 'RUN_VALIDATE'){
+    var info2 = readSelection();
+    if (info2) runValidation(info2);
+  }
+  if (msg.type === 'APPLY_FIELDS'){
+    var info3 = readSelection(); if (!info3) return;
+    var apply = msg.apply||{}, v = msg.values||{};
+    function setText(node, val){
+      if (node && val!=null){
+        try{ node.characters = String(val); }catch(e){}
+      }
+    }
+    if (apply.title) setText(info3.nodes.titleNode, v.title);
+    if (apply.desc)  setText(info3.nodes.descNode,  v.desc);
+    if (apply.left)  setText(info3.nodes.leftNode,  v.left);
+    if (apply.right) setText(info3.nodes.rightNode, v.right);
+
+    figma.notify('텍스트가 적용되었습니다.');
+    var next = readSelection(); if (next) postSelectionInfo(next);
+  }
+  if (msg.type === 'CLOSE'){
+    figma.closePlugin();
   }
 };
 
-// 초기 핑
-figma.ui.postMessage({ type:"hello", from:"plugin", msg:"plugin ready" });
+// =============== Show UI ===============
+figma.showUI(__html__, { width: 860, height: 680 });

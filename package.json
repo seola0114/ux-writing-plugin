@@ -1,0 +1,20 @@
+{
+  "name": "ux-writing-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo '🎨 Figma Plugin 개발모드 실행 중 (code.js / ui.html 직접 사용)'",
+    "build": "echo '🧱 번들링 불필요 — manifest.json이 code.js와 ui.html을 직접 참조합니다.'"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.119.0"
+  }
+  {
+  "scripts": {
+    "dev": "echo '🎨 Figma Plugin 개발모드 실행 중 (code.js / ui.html 직접 사용)'",
+    "build": "echo '🧱 번들링 불필요 — manifest.json이 code.js와 ui.html을 직접 참조합니다.'",
+    "lint": "eslint . --ext .js,.mjs",
+    "fix": "eslint . --ext .js,.mjs --fix && prettier . -w"
+  }
+}
+}

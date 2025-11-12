@@ -9,9 +9,7 @@
   "networkAccess": {
     "allowedDomains": [
       "https://script.google.com",
-      "https://script.googleusercontent.com",
-      "https://seola-kim.workers.dev",
-      "https://late-rain-59eb.seola-kim.workers.dev/"
+      "https://script.googleusercontent.com"
     ]
   }
 }
