@@ -1,14 +1,16 @@
 {
   "name": "UX Writing Lint – Modal/Toast Helper",
-  "id": "1569606040594637164",
+  "id": "ux-writing-lint",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
   "editorType": ["figma", "dev"],
-  "documentAccess": "dynamic-page",
+  "permissions": ["currentuser"],
   "networkAccess": {
     "allowedDomains": [
-      "https://late-rain-59eb.seola-kim.workers.dev"
+      "https://late-rain-59eb.seola-kim.workers.dev",
+      "https://script.google.com",
+      "https://script.googleusercontent.com"
     ]
   }
 }

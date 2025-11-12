@@ -7,8 +7,8 @@
                img-src data:;
                style-src 'unsafe-inline';
                script-src 'unsafe-inline';
-               connect-src https://script.google.com https://script.googleusercontent.com;">
-<title>UX Writing Lint Helper</title>
+               connect-src https://late-rain-59eb.seola-kim.workers.dev;">
+              <title>UX Writing Lint Helper</title>
 <style>
 :root {
   --ink:#16171B; --muted:#868C98; --line:#E7E7EA;
@@ -304,6 +304,24 @@ onmessage = (e)=>{
     renderPreview(sug,isDestructive);
   });
 });
+// ...
+  document.getElementById('ai-run').onclick = () => {
+    const prompt = document.getElementById('ai-prompt').value || '';
+    parent.postMessage({ pluginMessage: { type:'RUN_AI', prompt } }, '*');
+  };
+
+  onmessage = (e) => {
+    const msg = e.data && e.data.pluginMessage;
+    if (!msg) return;
+
+    if (msg.type === 'AI_RESULT') {
+      const out = msg.ok ? (msg.text || JSON.stringify(msg)) : `AI 호출 실패: ${msg.error||'unknown'}`;
+      document.getElementById('ai-result').value = out;
+    }
+  }
+    // ... 기존 SCAN_RESULT 처리 그대로
 </script>
+
+
 </body>
 </html>

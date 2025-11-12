@@ -269,3 +269,39 @@ figma.ui.onmessage = async (msg)=>{
   if(msg.type==='APPLY_SUGGEST'){ applySuggest(msg.values||{}); }
   if(msg.type==='RUN_AI'){ runAI(msg.prompt||''); }
 };
+
+// code.js (핵심만 — 기존 검사 로직은 그대로 두고, RUN_AI 핸들러만 추가)
+const WORKER_URL = "https://late-rain-59eb.seola-kim.workers.dev/";
+
+// UI 오픈
+figma.showUI(__html__, { width: 920, height: 640 });
+
+// UI → Main 메시지
+figma.ui.onmessage = async (msg) => {
+  if (!msg) return;
+
+  // ▼ 기존: RUN_SCAN / APPLY_SUGGEST 등은 그대로…
+
+  // ▼ AI 요청: Main에서 Worker 프록시로 POST
+  if (msg.type === "RUN_AI") {
+    try {
+      const prompt = String(msg.prompt || "");
+      const res = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+      const text = await res.text(); // Worker가 JSON 문자열을 넘긴다고 가정
+      let data;
+      try { data = JSON.parse(text); } catch { data = { text }; }
+
+      figma.ui.postMessage({ type: "AI_RESULT", ok: true, ...data });
+    } catch (e) {
+      figma.ui.postMessage({
+        type: "AI_RESULT",
+        ok: false,
+        error: (e && e.message) || "Failed to fetch"
+      });
+    }
+  }
+};
