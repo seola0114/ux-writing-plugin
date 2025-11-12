@@ -1,487 +1,309 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src https://script.google.com https://script.googleusercontent.com; font-src data:;">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UX Writing Lint</title>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none';
+               img-src data:;
+               style-src 'unsafe-inline';
+               script-src 'unsafe-inline';
+               connect-src https://script.google.com https://script.googleusercontent.com;">
+<title>UX Writing Lint Helper</title>
 <style>
-  body{font:12px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,Arial,sans-serif;margin:0;color:#111}
-  .wrap{padding:12px 14px}
-  .row{display:flex;gap:8px;align-items:center;margin:6px 0}
-  .col{flex:1}
-  input[type=text], textarea{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px 10px}
-  textarea{min-height:64px;resize:vertical}
-  .btn{border:1px solid #ddd;background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}
-  .btn.primary{background:#111;color:#fff;border-color:#111}
-  .btn.ghost{background:#f6f6f6}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:600;font-size:11px;border:1px solid #eee;background:#fafafa}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .card{border:1px solid #eee;border-radius:10px;padding:10px}
-  .card h2{font-size:12px;margin:0 0 8px}
-  .kvs{display:grid;grid-template-columns:120px 1fr auto;gap:6px;align-items:center}
-  .line{height:1px;background:#f0f0f0;margin:10px 0}
-  .list{margin:0;padding-left:18px}
-  .pill{display:inline-block;padding:1px 6px;border-radius:999px;font-size:11px;border:1px solid #eee}
-  .ok{color:#047857}.warn{color:#b45309}.fail{color:#b91c1c}
-  .chip{display:inline-block;border-radius:6px;padding:2px 6px;border:1px solid #eee;font-size:11px}
-  .chip-ok{background:#ecfdf5}.chip-warn{background:#fffbeb}
-  .help{color:#666;font-size:11px}
-  .tabs{display:flex;gap:6px;margin-top:10px}
-  .tab{padding:6px 10px;border:1px solid #eee;border-radius:8px;cursor:pointer}
-  .tab.active{background:#111;color:#fff;border-color:#111}
-  .hide{display:none}
-  .right{text-align:right}
+:root {
+  --ink:#16171B; --muted:#868C98; --line:#E7E7EA;
+  --primary:#287EFF; --danger:#E5484D;
+  --bg:#fff; --chip-bg:#eef1ff; --chip-ink:#3b5bff;
+}
+
+html, body {
+  margin:0; padding:0;
+  font:13px/1.45 "SUIT Variable",-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;
+  color:var(--ink); background:var(--bg);
+}
+
+.wrap { padding:12px; }
+
+.row { display:flex; gap:8px; align-items:center; }
+.right { margin-left:auto; }
+
+.btn {
+  padding:0 12px; height:28px; border:1px solid var(--line);
+  border-radius:6px; background:#fff; cursor:pointer;
+  font:inherit;
+}
+.btn.primary { background:#287EFF; color:#fff; border-color:#287EFF; }
+.btn.ghost { background:transparent; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+
+.tabs { display:flex; gap:8px; margin-bottom:12px; }
+.tab {
+  height:28px; padding:0 10px; border:1px solid var(--line);
+  border-radius:6px; background:#fff; cursor:pointer;
+}
+.tab.active { background:#287EFF; color:#fff; border-color:#287EFF; }
+
+.panel { display:none; }
+.panel.active { display:block; }
+
+.card {
+  border:1px solid var(--line); border-radius:12px;
+  padding:12px; background:#fff;
+}
+
+.head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.chip {
+  display:inline-flex; align-items:center;
+  height:22px; padding:0 8px;
+  border-radius:999px; background:var(--chip-bg); color:var(--chip-ink);
+  font-weight:600;
+}
+
+.fields {
+  display:grid; grid-template-columns:110px 1fr;
+  gap:8px 12px; align-items:center;
+}
+.label { color:#666; }
+.input, textarea {
+  width:100%; min-height:28px;
+  border:1px solid var(--line); border-radius:6px;
+  padding:6px 8px; font:inherit;
+}
+textarea { min-height:48px; resize:vertical; }
+
+.disabled .input, .disabled textarea { background:#f8f8f8; }
+.error .input, .error textarea { border-color:var(--danger); background:#fff6f6; }
+
+.status { display:flex; gap:6px; flex-wrap:wrap; }
+.status .chip.ok{ background:#e7f8f0; color:#13795b; }
+.status .chip.warn{ background:#fff6e6; color:#a35b00; }
+.status .chip.fail{ background:#ffe8ea; color:#b3261e; }
+
+/* ▶▶ 레이아웃: 왼쪽은 300~340px 고정폭, 오른쪽은 유동 + 400px 미리보기 수용 */
+.preview-wrap {
+  display:grid;
+  grid-template-columns: minmax(280px, 320px) 1fr;
+  gap:16px;
+  align-items:start;
+}
+
+/* ------------------- 미리보기 모달 ------------------- */
+.preview-modal {
+  width:400px;           /* 미리보기 카드 고정폭 */
+  border-radius:12px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+}
+.preview-header {
+  padding:24 24 0 24; display:flex; align-items:center; gap:px;
+}
+.preview-title {
+  max-width:352px;               /* 타이틀 영역 폭 */
+  color:var(--ink);
+  font:800 18px/24px "SUIT Variable",sans-serif;
+  white-space:normal;
+  word-break:keep-all;           /* 단어 단위 우선 줄바꿈 */
+  overflow-wrap:anywhere;        /* 너무 긴 토큰(영문/숫자)은 필요시 임의 위치에서 줄바꿈 */
+  line-break:anywhere;           /* CJK 줄바꿈 보정 */
+}
+.preview-identifier {
+  color: #DC0C0C;
+  font-size: 14px;
+  font-family: SUIT Variable;
+  font-weight: 700;
+  line-height: 20px;
+  word-wrap: break-word;
+}
+.preview-body {
+  padding:8px 24px 24px;
+  color:#868C98;
+  font:500 14px/20px "SUIT Variable",sans-serif;
+}
+.preview-condition {
+  margin-top:6px; font-size:13px; color:#5a5f6b;
+}
+.preview-condition ul { margin:6px 0 0 18px; padding:0; }
+
+.preview-footer {
+  padding:0 24px 24px;
+  display:flex; justify-content:flex-end; gap:8px;
+}
+.btn-lg {
+  padding:8px 16px; border-radius:6px;
+  font:700 14px/20px "SUIT Variable",sans-serif;
+  display:flex; align-items:center; justify-content:center;
+}
+.btn-secondary { background:#fff; outline:1px #C9CDD7 solid; color:#444855; }
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-danger  { background:var(--danger); color:#fff; }
 </style>
 </head>
 <body>
 <div class="wrap">
-
   <div class="row">
-    <span class="badge" id="badge-kind">-</span>
-    <span class="help" id="badge-help" style="margin-left:6px">선택 후 분석을 실행하세요.</span>
-    <div style="flex:1"></div>
-    <button class="btn" id="btn-select">선택 분석</button>
-    <button class="btn primary" id="btn-validate">검사 실행</button>
-    <button class="btn ghost" id="btn-exit">플러그인 종료</button>
+    <div class="tabs">
+      <button class="tab active" data-tab="lint" type="button">검사</button>
+      <button class="tab" data-tab="ai" type="button">AI 텍스트 추천</button>
+    </div>
+    <div class="right row">
+      <button id="reset" class="btn ghost" type="button">초기화</button>
+      <button id="run" class="btn primary" type="button">검사하기</button>
+    </div>
   </div>
 
-  <div class="line"></div>
-
-  <div class="grid">
-    <div class="card">
-      <h2>선택 정보 & 빠른 적용</h2>
-      <div class="kvs">
-        <div>Title</div>
-        <div><input type="text" id="f-title" placeholder="제목"/></div>
-        <div><button class="btn" data-apply="title">적용</button></div>
-
-        <div>Description (설명)</div>
-        <div><textarea id="f-desc" placeholder="설명"></textarea></div>
-        <div><button class="btn" data-apply="desc">적용</button></div>
-
-        <div>왼쪽 버튼</div>
-        <div><input type="text" id="f-left" placeholder="취소"/></div>
-        <div><button class="btn" data-apply="left">적용</button></div>
-
-        <div>오른쪽 버튼</div>
-        <div><input type="text" id="f-right" placeholder="확인 / 삭제"/></div>
-        <div><button class="btn" data-apply="right">적용</button></div>
+  <!-- 검사 탭 -->
+  <div id="panel-lint" class="panel active">
+    <div class="preview-wrap">
+      <!-- 왼쪽 현재 상태(좁은 폭) -->
+      <div class="card">
+        <div class="head">
+          <div class="chip" id="det-kind">-</div>
+          <div class="status" id="det-badges"></div>
+        </div>
+        <div class="fields" id="cur-fields">
+          <div class="label">Title</div><input id="cur-title" class="input" readonly>
+          <div class="label">Identifier</div><input id="cur-ident" class="input" readonly>
+          <div class="label">Description</div><textarea id="cur-desc" class="input" readonly></textarea>
+          <div class="label">Condition</div><textarea id="cur-cond" class="input" readonly></textarea>
+          <div class="label">Left button</div><input id="cur-left" class="input" readonly>
+          <div class="label">Right button</div><input id="cur-right" class="input" readonly>
+        </div>
       </div>
 
-      <div class="line"></div>
-      <div class="help">버튼 수: <span id="btn-count">-</span></div>
-      <div class="help">오른쪽 버튼 스타일: <span id="btn-style">-</span> <span id="btn-fill" class="pill">-</span></div>
-    </div>
+      <!-- 오른쪽 제안 + 400px 미리보기 -->
+      <div class="card">
+        <div class="head">
+          <div class="chip" id="rec-kind">-</div>
+          <span class="muted">제안 텍스트</span>
+          <div class="right"><button id="apply" class="btn primary" type="button">적용하기</button></div>
+        </div>
 
-    <div class="card">
-      <h2>컴포넌트 적합성 & 권장 유형</h2>
-      <div class="row"><div>현재 유형</div><div class="col"><span id="suit-kind" class="chip">-</span></div></div>
-      <div class="row"><div>권장 유형</div><div class="col"><span id="suit-reco" class="chip">-</span></div></div>
-      <ul id="suit-reasons" class="list"></ul>
-    </div>
-  </div>
+        <!-- 미리보기 -->
+        <div class="preview-modal" id="modal-preview">
+          <div class="preview-header">
+            <div id="pvTitle" class="preview-title">제목이 표시됩니다.</div>
+          </div>
+          <div class="preview-body">
+            <div id="pvIdent" class="preview-identifier" style="display:none;">1행</div>
+            <div id="pvDesc">본문이 표시됩니다.</div>
+            <div id="pvCond" class="preview-condition" style="display:none;">
+              <ul id="pvCondList"></ul>
+            </div>
+          </div>
+          <div class="preview-footer">
+            <div id="pvLeft" class="btn-lg btn-secondary" style="display:none;">취소</div>
+            <div id="pvRight" class="btn-lg btn-primary">확인</div>
+          </div>
+        </div>
 
-  <div class="line"></div>
-
-  <div class="grid">
-    <div class="card">
-      <h2>컴포넌트 사용 검사</h2>
-      <ul id="list-comp" class="list"></ul>
-    </div>
-    <div class="card">
-      <h2>텍스트 검사</h2>
-      <ul id="list-text" class="list"></ul>
-      <div class="line"></div>
-      <div class="help">추천 문구 빠른 반영</div>
-      <div class="kvs">
-        <div>제목 제안</div>
-        <div><input type="text" id="sg-title"></div>
-        <div><button class="btn" data-apply-sg="title">적용</button></div>
-
-        <div>설명 제안</div>
-        <div><textarea id="sg-desc"></textarea></div>
-        <div><button class="btn" data-apply-sg="desc">적용</button></div>
-
-        <div>왼쪽 버튼 제안</div>
-        <div><input type="text" id="sg-left"></div>
-        <div><button class="btn" data-apply-sg="left">적용</button></div>
-
-        <div>오른쪽 버튼 제안</div>
-        <div><input type="text" id="sg-right"></div>
-        <div><button class="btn" data-apply-sg="right">적용</button></div>
+        <!-- 제안 필드 -->
+        <div class="fields" style="margin-top:12px;">
+          <div class="label">Title</div><input id="sug-title" class="input">
+          <div class="label">Identifier</div><input id="sug-ident" class="input">
+          <div class="label">Description</div><textarea id="sug-desc" class="input"></textarea>
+          <div class="label">Condition</div><textarea id="sug-cond" class="input"></textarea>
+          <div class="label">Left button</div><input id="sug-left" class="input">
+          <div class="label">Right button</div><input id="sug-right" class="input">
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" data-tab="ai">추천(AI)</div>
-    <div class="tab" data-tab="help">도움말</div>
-  </div>
-
-  <div id="tab-ai">
+  <!-- AI 탭 -->
+  <div id="panel-ai" class="panel">
     <div class="card">
-      <h2>상황을 입력하면 적합한 컴포넌트를 추천합니다</h2>
-      <div class="row"><textarea id="ai-input" placeholder="예) 토스트에 문장이 2개 들어가 있고 확인을 유도해야 합니다."></textarea></div>
-      <div class="row">
-        <button class="btn primary" id="ai-run">추천 받기</button>
-        <div id="ai-status" class="help" style="margin-left:10px;">-</div>
+      <div class="head"><div class="chip">AI 추천</div><span class="muted">상황을 입력하면 적합한 문구를 제안합니다.</span></div>
+      <div class="fields">
+        <div class="label">상황</div><textarea id="ai-prompt" class="input"></textarea>
+        <div class="label">결과</div><textarea id="ai-result" class="input" readonly></textarea>
       </div>
-      <div class="line"></div>
-      <div class="row"><div>추천 결과</div><div class="col"><span id="ai-kind" class="chip">-</span></div></div>
-      <ul id="ai-reasons" class="list"></ul>
+      <div class="row" style="margin-top:8px;">
+        <button id="ai-run" class="btn primary" type="button">AI 추천 실행</button>
+      </div>
     </div>
   </div>
-
-  <div id="tab-help" class="hide">
-    <div class="card">
-      <h2>가이드</h2>
-      <ul class="list">
-        <li>Delete Modal: ‘취소/삭제/폐기/초기화…’ 등 파괴적 작업. 오른쪽 버튼은 빨간색(Destructive) 권장.</li>
-        <li>Confirm Modal: 확인이 필요한 경우. 오른쪽 ‘확인/저장/변경/확정’, 왼쪽 ‘취소’ 권장.</li>
-        <li>Alert Modal: 단일 버튼 간단 알림.</li>
-        <li>Toast Success(연두): 짧은 결과 피드백 한 문장.</li>
-        <li>Toast Caution(노랑): 완료 조건/필수 정보 한 문장.</li>
-      </ul>
-      <div class="line"></div>
-      <div class="help">AI 추천에서 GAS URL 미설정/CORS 미허용 시 “Failed to fetch”가 표시될 수 있습니다.</div>
-    </div>
-  </div>
-
 </div>
 
 <script>
-(function(){
-  var GAS_URL = ""; // 필요 시 Apps Script 웹앱 URL
-
-  function postToPlugin(msg){ parent.postMessage({ pluginMessage: msg }, '*'); }
-
-  // 버튼들
-  document.getElementById('btn-select').onclick = function(){ postToPlugin({ type:'REQUEST_SELECTION' }); };
-  document.getElementById('btn-validate').onclick = function(){ postToPlugin({ type:'RUN_VALIDATE' }); };
-  document.getElementById('btn-exit').onclick = function(){ postToPlugin({ type:'CLOSE' }); };
-
-  // 적용 버튼(원본/제안)
-  function bindApply(selector, pick){
-    var list = document.querySelectorAll(selector);
-    for (var i=0;i<list.length;i++){
-      list[i].onclick = function(){
-        var field = this.getAttribute(pick);
-        var v = {
-          title: document.getElementById('f-title').value,
-          desc:  document.getElementById('f-desc').value,
-          left:  document.getElementById('f-left').value,
-          right: document.getElementById('f-right').value
-        };
-        if (pick === 'data-apply-sg'){
-          v = {
-            title: document.getElementById('sg-title').value,
-            desc:  document.getElementById('sg-desc').value,
-            left:  document.getElementById('sg-left').value,
-            right: document.getElementById('sg-right').value
-          };
-        }
-        var apply = { title:false, desc:false, left:false, right:false };
-        apply[field] = true;
-        postToPlugin({ type:'APPLY_FIELDS', apply:apply, values:v });
-      };
-    }
-  }
-  bindApply('[data-apply]', 'data-apply');
-  bindApply('[data-apply-sg]', 'data-apply-sg');
-
-  // 탭
-  var tabs = document.querySelectorAll('.tab');
-  tabs.forEach(function(t){
-    t.onclick = function(){
-      tabs.forEach(function(x){ x.classList.remove('active'); });
-      t.classList.add('active');
-      document.getElementById('tab-ai').classList.toggle('hide', t.dataset.tab!=='ai');
-      document.getElementById('tab-help').classList.toggle('hide', t.dataset.tab!=='help');
-    };
+/* 탭 */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
   });
-
-  // AI 추천(로컬 규칙 fallback)
-  document.getElementById('ai-run').onclick = function(){
-    var text = document.getElementById('ai-input').value || '';
-    var status = document.getElementById('ai-status');
-    var kind = document.getElementById('ai-kind');
-    var reasonsEl = document.getElementById('ai-reasons');
-    status.textContent = '추천을 불러오는 중...';
-    kind.textContent = '-';
-    reasonsEl.innerHTML = '';
-
-    function localRecommend(t){
-      t = (t||'').replace(/\s+/g,' ').trim();
-      var reasons = [];
-      var key='confirm', label='Confirm Modal';
-      var sc = (t.match(/다\.|요\.|[\.!?…]+/g)||[]).length; if (!sc && t) sc=1;
-
-      if (/(삭제|제거|폐기|초기화|되돌릴 수 없)/.test(t)){ key='delete'; label='Delete Modal'; reasons.push('파괴적 작업 키워드 감지.'); }
-      else if (/토스트|toast/i.test(t)){
-        if (sc>=2){ key='confirm'; label='Confirm Modal'; reasons.push('토스트는 한 문장 권장, 문장 '+sc+'개 감지.'); }
-        if (t.length>80){ key='confirm'; label='Confirm Modal'; reasons.push('토스트는 80자 이하 권장, 현재 '+t.length+'자.'); }
-        if (/(확인|저장|변경|취소|다시 시도|입력)/.test(t)){ key='confirm'; label='Confirm Modal'; reasons.push('행동 유도 문구 포함 → 모달 권장.'); }
-        if (!reasons.length){ key='toast-success'; label='Toast Success'; reasons.push('간단 결과 피드백은 토스트 적합.'); }
-      } else {
-        if (sc<=1 && t.length<=80){ key='toast-success'; label='Toast Success'; reasons.push('짧은 한 문장 알림 → 토스트 적합.'); }
-        else { key='confirm'; label='Confirm Modal'; reasons.push('문장 수/길이 기준으로 모달 권장.'); }
-      }
-      return {kind:key, label:label, reasons:reasons};
-    }
-
-    if (!GAS_URL){
-      var r = localRecommend(text);
-      status.textContent = '완료(로컬 규칙)';
-      kind.textContent = r.label;
-      r.reasons.forEach(function(m){ var li=document.createElement('li'); li.textContent=m; reasonsEl.appendChild(li); });
-      return;
-    }
-
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text:text}) })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if (!d || !d.kind){ status.textContent='추천을 불러오는 중 오류가 발생했습니다.'; return; }
-        status.textContent='완료';
-        kind.textContent = d.kindLabel || d.kind;
-        (d.reasons||[]).forEach(function(m){ var li=document.createElement('li'); li.textContent=m; reasonsEl.appendChild(li); });
-      })
-      .catch(function(){ status.textContent='추천을 불러오는 중 오류가 발생했습니다. (Failed to fetch)'; });
-  };
-
-  // Figma → UI
-  onmessage = function(e){
-    var msg = e && e.data && e.data.pluginMessage;
-    if (!msg) return;
-
-    if (msg.type === 'SELECTION_INFO'){
-      var p = msg.payload || {};
-      document.getElementById('badge-kind').textContent = p.badge || '-';
-      document.getElementById('badge-help').textContent = p.help || '-';
-      document.getElementById('btn-count').textContent = p.buttonCount != null ? String(p.buttonCount) : '-';
-      document.getElementById('btn-style').textContent = (p.style && p.style.rightStyleName) ? p.style.rightStyleName : '-';
-      document.getElementById('btn-fill').textContent  = (p.style && p.style.rightFill) ? p.style.rightFill : '-';
-
-      document.getElementById('f-title').value = p.titleText || '';
-      document.getElementById('f-desc').value  = p.descText || '';
-      document.getElementById('f-left').value  = p.leftText || '';
-      document.getElementById('f-right').value = p.rightText || '';
-
-      // 현재 유형
-      document.getElementById('suit-kind').textContent = (p.detected && (p.detected.label||p.detected.key)) || '-';
-      document.getElementById('suit-reco').textContent = '현재 컴포넌트가 적합합니다.';
-      document.getElementById('suit-reco').className = 'chip chip-ok';
-      document.getElementById('suit-reasons').innerHTML = '';
-    }
-
-    if (msg.type === 'VALIDATION_RESULT'){
-      function renderList(ulId, arr){
-        var ul = document.getElementById(ulId);
-        ul.innerHTML = '';
-        if (!arr || !arr.length){
-          var li0 = document.createElement('li'); li0.textContent='문제가 발견되지 않았습니다.'; ul.appendChild(li0); return;
-        }
-        arr.forEach(function(x){
-          var li = document.createElement('li'); li.className = x.level||'ok'; li.textContent = '['+(x.level||'OK').toUpperCase()+'] '+(x.message||''); ul.appendChild(li);
-        });
-      }
-      renderList('list-comp', msg.result && msg.result.comp);
-      renderList('list-text', msg.result && msg.result.text);
-
-      var sg = (msg.result && msg.result.suggest) || {};
-      document.getElementById('sg-title').value = sg.title || '';
-      document.getElementById('sg-desc').value  = sg.desc || '';
-      document.getElementById('sg-left').value  = sg.left || '';
-      document.getElementById('sg-right').value = sg.right || '';
-
-      // 권장 유형
-      var reco = msg.result && msg.result.recommend;
-      var suitReco = document.getElementById('suit-reco');
-      var map = { confirm:'Confirm Modal', delete:'Delete Modal', alert:'Alert Modal', 'toast-success':'Toast Success', 'toast-caution':'Toast Caution' };
-      if (reco && reco.recommend){
-        suitReco.textContent = '더 적합: ' + (map[reco.recommend] || reco.recommend);
-        suitReco.className = 'chip chip-warn';
-      } else {
-        suitReco.textContent = '현재 컴포넌트가 적합합니다.';
-        suitReco.className = 'chip chip-ok';
-      }
-      var ul = document.getElementById('suit-reasons'); ul.innerHTML='';
-      (reco && reco.reasons || []).forEach(function(m){ var li=document.createElement('li'); li.textContent=m; ul.appendChild(li); });
-
-      document.getElementById('suit-kind').textContent = msg.result.kindLabel || msg.result.kind || '-';
-    }
-  };
-})();
-</script>
-<!-- 상황 입력 + 키 입력 -->
-<div style="display:flex; gap:8px; align-items:center">
-  <input id="geminiKey" type="password" placeholder="Gemini API Key" style="width:260px">
-  <button id="saveKey">키 저장</button>
-</div>
-<textarea id="situation" rows="3" style="width:100%;margin-top:8px"
-  placeholder="상황을 적어주세요 (예: 화주와 청구고객이 동일해서 '청구고객변경 결재'가 필요 없음)"></textarea>
-<div style="margin-top:8px; display:flex; gap:8px">
-  <button id="btnGemini">추천 받기(Gemini)</button>
-  <button id="btnLocal">오프라인 추천(폴백)</button>
-</div>
-
-<!-- 결과 표시 -->
-<div style="margin:12px 0">
-  <b>추천 유형:</b> <span id="reco-type">-</span>
-  <ul id="reco-reasons"></ul>
-</div>
-
-<!-- 제안 카피 -->
-<div style="display:grid; grid-template-columns:140px 1fr; gap:6px; align-items:center">
-  <label>제목</label>        <input id="sug-title"  />
-  <label>Description</label> <input id="sug-desc"   />
-  <label>왼쪽 버튼</label>   <input id="sug-left"   />
-  <label>오른쪽 버튼</label> <input id="sug-right"  />
-  <div></div><small id="sug-right-style"></small>
-</div>
-<button id="apply">선택 항목에 적용</button>
-
-<script>
-const $ = s=>document.querySelector(s);
-const list = (id, arr)=>{ const ul=document.getElementById(id); ul.innerHTML='';
-  (arr||[]).forEach(t=>{ const li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
-};
-
-// 키 저장/로드
-(function initKey(){
-  const k = localStorage.getItem('gemini_api_key')||'';
-  if(k) $('#geminiKey').value = k;
-})();
-$('#saveKey').onclick = ()=>{ localStorage.setItem('gemini_api_key', $('#geminiKey').value.trim()); alert('저장됨'); };
-
-// 결과 그리기
-function renderResult(p){
-  document.getElementById('reco-type').textContent = p.type || '-';
-  list('reco-reasons', p.reasons||[]);
-  $('#sug-title').value  = (p.suggest && p.suggest.title)  || '';
-  $('#sug-desc').value   = (p.suggest && p.suggest.desc)   || '';
-  $('#sug-left').value   = (p.suggest && p.suggest.left)   || '';
-  $('#sug-right').value  = (p.suggest && p.suggest.right)  || '';
-  document.getElementById('sug-right-style').textContent =
-    p.suggest && p.suggest.rightStyle ? ('오른쪽 버튼 스타일: ' + p.suggest.rightStyle) : '';
-}
-
-// 로컬 폴백(이전 대화에서 주던 간단 규칙 버전)
-function localFallback(situation){
-  parent.postMessage({ pluginMessage:{ type:'LOCAL_RECO', situation:situation } }, '*');
-}
-
-$('#btnLocal').onclick = ()=>{
-  const s = $('#situation').value.trim();
-  if(!s) return alert('상황을 입력하세요');
-  localFallback(s);
-};
-
-// Gemini 호출
-$('#btnGemini').onclick = async ()=>{
-  const s = $('#situation').value.trim();
-  if(!s) return alert('상황을 입력하세요');
-  const key = ($('#geminiKey').value||localStorage.getItem('gemini_api_key')||'').trim();
-  if(!key) return alert('Gemini API 키를 입력/저장하세요');
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`;
-
-  // 모델이 반드시 JSON으로 답하도록 요청
-  const body = {
-    generationConfig: { response_mime_type: "application/json" },
-    contents: [{
-      role: "user",
-      parts: [{
-        text:
-`너는 UX 라이터 도우미야. 아래 '상황'을 읽고 토스트/모달 중 가장 적합한 유형을 추천하고,
-제목/설명/버튼 텍스트를 한국어로 제안해.
-규칙:
-- 파괴적 작업(삭제/취소/되돌릴 수 없음)은 Delete Modal + 빨간 버튼.
-- 사용자의 결정/확인이 필요하거나 80자 초과/문장 2개 이상이면 Confirm Modal.
-- 한 문장 내 결과 피드백은 Toast Success.
-- 조건/유의/안내는 Toast Caution.
-반환은 반드시 JSON:
-{
-  "type": "delete|confirm-2btn|confirm-1btn|toast-success|toast-caution",
-  "reasons": ["..."],
-  "suggest": { "title":"", "desc":"", "left":"", "right":"", "rightStyle":"danger|primary|neutral" }
-}
-상황: ${s}`
-      }]
-    }]
-  };
-
-  try{
-    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    if(!res.ok){ throw new Error('HTTP '+res.status); }
-    const data = await res.json();
-    // v1beta generateContent 응답 파싱
-    const text = (((data||{}).candidates||[])[0]||{}).content?.parts?.[0]?.text || '';
-    const parsed = JSON.parse(text);        // 모델이 준 JSON
-    renderResult(parsed);
-  }catch(e){
-    console.error('Gemini error', e);
-    alert('Gemini 호출 실패 → 로컬 규칙으로 대체합니다.');
-    localFallback(s);
-  }
-}
-
-// Figma → UI 메시지 수신(로컬 폴백 결과)
-window.onmessage = (e)=>{
-  const msg = e.data && e.data.pluginMessage;
-  if(!msg) return;
-  if(msg.type === 'LOCAL_RECO_RESULT'){
-    renderResult(msg.payload||{});
-  }
-};
-
-// 적용
-$('#apply').onclick = ()=>{
-  parent.postMessage({ pluginMessage:{
-    type:'APPLY_FIELDS',
-    apply:{ title:true, desc:true, left:true, right:true },
-    values:{
-      title: $('#sug-title').value||'',
-      desc:  $('#sug-desc').value||'',
-      left:  $('#sug-left').value||'',
-      right: $('#sug-right').value||''
-    }
-  }}, '*');
-};
-const WORKER_URL = 'https://late-rain-59eb.seola-kim.workers.dev/';
-
-async function askAI(situationText) {
-  try {
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // 서버/워커 모두 JSON 기대
-      body: JSON.stringify({ text: situationText })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();   // <— 반드시 JSON
-    // { type, reasons[], suggestion:{title,description,left,right} } 형태 기대
-    return data;
-  } catch (e) {
-    // 패널에 에러 표시
-    console.error(e);
-    showAiError('추천을 불러오는 중 오류가 발생했습니다. ' + (e.message || 'Failed to fetch'));
-    return null;
-  }
-}
-
-// 예시: 버튼 클릭 시 호출
-document.getElementById('btn-ai-reco').addEventListener('click', async () => {
-  const situation = document.getElementById('free-input').value.trim();
-  if (!situation) return;
-  setAiLoading(true);
-  const result = await askAI(situation);
-  setAiLoading(false);
-  if (result) {
-    renderAiRecommendation(result); // 패널에 유형/사유/제안 타이틀/설명/버튼명 뿌리는 함수
-  }
 });
 
+/* 버튼 */
+const post = (type, payload={}) => parent.postMessage({pluginMessage:{type, ...payload}}, '*');
+document.getElementById('run').onclick   = ()=>post('RUN_SCAN');
+document.getElementById('reset').onclick = ()=>post('RESET');
+document.getElementById('apply').onclick = ()=>post('APPLY_SUGGEST',{values:collectSug()});
+document.getElementById('ai-run').onclick= ()=>post('RUN_AI',{prompt:document.getElementById('ai-prompt').value});
+
+/* 헬퍼 */
+const $ = id=>document.getElementById(id);
+const v = id=>$(id).value||'';
+const set = (id,val)=>$(id).value = val||'';
+const collectSug=()=>({title:v('sug-title'),ident:v('sug-ident'),desc:v('sug-desc'),cond:v('sug-cond'),left:v('sug-left'),right:v('sug-right')});
+
+/* 미리보기 렌더 */
+function renderPreview(sug,isDestructive){
+  $('pvTitle').textContent = sug.title || '';
+  const ident = sug.ident || '';
+  $('pvIdent').style.display = ident ? '' : 'none';
+  $('pvIdent').textContent = ident;
+
+  $('pvDesc').textContent = sug.desc || '';
+
+  const cond = (sug.cond||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
+  const wrap = $('pvCond'); const list = $('pvCondList'); list.innerHTML='';
+  cond.forEach(c=>{const li=document.createElement('li'); li.textContent=c; list.appendChild(li);});
+  wrap.style.display = cond.length ? '' : 'none';
+
+  const left=$('pvLeft'), right=$('pvRight');
+  if(sug.left){ left.style.display='flex'; left.textContent=sug.left; } else { left.style.display='none'; }
+  right.textContent = sug.right || '확인';
+  right.className = 'btn-lg '+(isDestructive?'btn-danger':'btn-primary');
+}
+
+/* 플러그인 메시지 */
+onmessage = (e)=>{
+  const msg=e.data.pluginMessage; if(!msg) return;
+  if(msg.type==='SCAN_RESULT'){
+    const sug=msg.suggest||{};
+    const isDestructive=/삭제|폐기|되돌릴 수 없/.test(sug.title||'')||/삭제|폐기/.test(sug.right||'');
+    set('sug-title',sug.title||'');
+    set('sug-ident',sug.identifier||sug.ident||'');
+    set('sug-desc',sug.description||sug.desc||'');
+    set('sug-cond',sug.condition||sug.cond||'');
+    set('sug-left',sug.leftButton||sug.left||'');
+    set('sug-right',sug.rightButton||sug.right||'');
+    renderPreview(collectSug(),isDestructive);
+
+    /* 좌측 현재 상태도 채우기 */
+    set('cur-title', msg.current?.title || '');
+    set('cur-ident', msg.current?.identifier || '');
+    set('cur-desc', msg.current?.description || '');
+    set('cur-cond', msg.current?.condition || '');
+    set('cur-left', msg.current?.leftButton || '');
+    set('cur-right', msg.current?.rightButton || '');
+  }
+  if(msg.type==='AI_RESULT'){ $('ai-result').value = msg.text || ''; }
+};
+
+/* 입력시 즉시 미리보기 */
+['sug-title','sug-ident','sug-desc','sug-cond','sug-left','sug-right'].forEach(id=>{
+  $(id).addEventListener('input',()=>{
+    const sug=collectSug();
+    const isDestructive=/삭제|폐기|되돌릴 수 없/.test(sug.title)||/삭제|폐기/.test(sug.right);
+    renderPreview(sug,isDestructive);
+  });
+});
 </script>
 </body>
 </html>
