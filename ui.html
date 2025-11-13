@@ -1,145 +1,168 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy"
-      content="default-src 'none';
-               img-src data:;
-               style-src 'unsafe-inline';
-               script-src 'unsafe-inline';
-               connect-src https://late-rain-59eb.seola-kim.workers.dev;">
-              <title>UX Writing Lint Helper</title>
-<style>
-:root {
-  --ink:#16171B; --muted:#868C98; --line:#E7E7EA;
-  --primary:#287EFF; --danger:#E5484D;
-  --bg:#fff; --chip-bg:#eef1ff; --chip-ink:#3b5bff;
-}
+  <meta charset="utf-8" />
+  <!-- Worker 로만 나가도록 CSP 제한 -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none';
+                 img-src data:;
+                 style-src 'unsafe-inline';
+                 script-src 'unsafe-inline';
+                 connect-src https://late-rain-59eb.seola-kim.workers.dev;">
+  <title>UX Writing Lint Helper</title>
+  <style>
+    :root {
+      --ink:#16171B; --muted:#868C98; --line:#E7E7EA;
+      --primary:#287EFF; --danger:#E5484D;
+      --bg:#fff; --chip-bg:#eef1ff; --chip-ink:#3b5bff;
+    }
 
-html, body {
+   html, body {
   margin:0; padding:0;
-  font:13px/1.45 "SUIT Variable",-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;
-  color:var(--ink); background:var(--bg);
+  font-family:"SUIT Variable",-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;
+  font-size:13px;
+  font-weight:400;   /* 기본 400 고정 */
+  line-height:1.45;
+  color:var(--ink); 
+  background:var(--bg);
 }
 
-.wrap { padding:12px; }
+    .wrap { padding:12px; }
 
-.row { display:flex; gap:8px; align-items:center; }
-.right { margin-left:auto; }
+    .row { display:flex; gap:8px; align-items:center; }
+    .right { margin-left:auto; }
 
-.btn {
-  padding:0 12px; height:28px; border:1px solid var(--line);
-  border-radius:6px; background:#fff; cursor:pointer;
-  font:inherit;
-}
-.btn.primary { background:#287EFF; color:#fff; border-color:#287EFF; }
-.btn.ghost { background:transparent; }
-.btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn {
+      padding:0 12px; height:28px; border:1px solid var(--line);
+      border-radius:6px; background:#fff; cursor:pointer;
+      font:inherit;
+    }
+    .btn.primary { background:#287EFF; color:#fff; border-color:#287EFF; }
+    .btn.ghost { background:transparent; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
 
-.tabs { display:flex; gap:8px; margin-bottom:12px; }
-.tab {
-  height:28px; padding:0 10px; border:1px solid var(--line);
-  border-radius:6px; background:#fff; cursor:pointer;
-}
-.tab.active { background:#287EFF; color:#fff; border-color:#287EFF; }
+    .tabs { display:flex; gap:8px; margin-bottom:12px; }
+    .tab {
+      height:28px; padding:0 10px; border:1px solid var(--line);
+      border-radius:6px; background:#fff; cursor:pointer;
+    }
+    .tab.active { background:#287EFF; color:#fff; border-color:#287EFF; }
 
-.panel { display:none; }
-.panel.active { display:block; }
+    .panel { display:none; }
+    .panel.active { display:block; }
 
-.card {
-  border:1px solid var(--line); border-radius:12px;
-  padding:12px; background:#fff;
-}
+    .card {
+      border:1px solid var(--line); border-radius:12px;
+      padding:12px; background:#fff;
+    }
 
-.head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-.chip {
-  display:inline-flex; align-items:center;
-  height:22px; padding:0 8px;
-  border-radius:999px; background:var(--chip-bg); color:var(--chip-ink);
-  font-weight:600;
-}
+    .head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .chip {
+      display:inline-flex; align-items:center;
+      height:22px; padding:0 8px;
+      border-radius:999px; background:var(--chip-bg); color:var(--chip-ink);
+      font-weight:600;
+    }
+    .muted { color:var(--muted); font-size:12px; }
 
-.fields {
-  display:grid; grid-template-columns:110px 1fr;
-  gap:8px 12px; align-items:center;
-}
-.label { color:#666; }
-.input, textarea {
-  width:100%; min-height:28px;
-  border:1px solid var(--line); border-radius:6px;
-  padding:6px 8px; font:inherit;
-}
-textarea { min-height:48px; resize:vertical; }
+    .fields {
+      display:grid; grid-template-columns:110px 1fr;
+      gap:8px 12px; align-items:center;
+    }
+    .label { color:#666; }
+    .input, textarea {
+      width:100%; min-height:28px;
+      border:1px solid var(--line); border-radius:6px;
+      padding:6px 8px; font:inherit;
+    }
+    textarea { min-height:48px; resize:vertical; }
 
-.disabled .input, .disabled textarea { background:#f8f8f8; }
-.error .input, .error textarea { border-color:var(--danger); background:#fff6f6; }
+    .input[disabled], textarea[disabled] {
+      background:#f5f5f5; color:#aaa;
+    }
+    .input.error, textarea.error {
+      border-color:var(--danger); background:#fff6f6;
+    }
 
-.status { display:flex; gap:6px; flex-wrap:wrap; }
-.status .chip.ok{ background:#e7f8f0; color:#13795b; }
-.status .chip.warn{ background:#fff6e6; color:#a35b00; }
-.status .chip.fail{ background:#ffe8ea; color:#b3261e; }
+    .status { display:flex; gap:6px; flex-wrap:wrap; }
+    .status .chip.ok{ background:#e7f8f0; color:#13795b; }
+    .status .chip.warn{ background:#fff6e6; color:#a35b00; }
+    .status .chip.fail{ background:#ffe8ea; color:#b3261e; }
 
-/* ▶▶ 레이아웃: 왼쪽은 300~340px 고정폭, 오른쪽은 유동 + 400px 미리보기 수용 */
-.preview-wrap {
-  display:grid;
-  grid-template-columns: minmax(280px, 320px) 1fr;
-  gap:16px;
-  align-items:start;
-}
+    /* ▶ 왼쪽은 상대적으로 좁게, 오른쪽은 400px 모달이 들어가도록 */
+    .preview-wrap {
+      display:grid;
+      grid-template-columns: minmax(260px, 320px) 1fr;
+      gap:16px;
+      align-items:start;
+    }
 
-/* ------------------- 미리보기 모달 ------------------- */
-.preview-modal {
-  width:400px;           /* 미리보기 카드 고정폭 */
-  border-radius:12px;
-  overflow:hidden;
-  border:1px solid var(--line);
-  background:#fff;
-  display:flex;
-  flex-direction:column;
-}
-.preview-header {
-  padding:24 24 0 24; display:flex; align-items:center; gap:px;
-}
-.preview-title {
-  max-width:352px;               /* 타이틀 영역 폭 */
+    /* ------------------- 미리보기 모달 ------------------- */
+    .preview-modal {
+      width:400px;
+      border-radius:12px;
+      overflow:hidden;
+      border:1px solid var(--line);
+      background:#fff;
+      display:flex;
+      flex-direction:column;
+    }
+    .preview-header {
+      padding:24px 24px 0 24px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .preview-title {
+  max-width:352px;
   color:var(--ink);
-  font:800 18px/24px "SUIT Variable",sans-serif;
+  font-family:"SUIT Variable",sans-serif;
+  font-size:18px;
+  font-weight:700; /* 제목은 굵게 700 */
+  line-height:24px;
   white-space:normal;
-  word-break:keep-all;           /* 단어 단위 우선 줄바꿈 */
-  overflow-wrap:anywhere;        /* 너무 긴 토큰(영문/숫자)은 필요시 임의 위치에서 줄바꿈 */
-  line-break:anywhere;           /* CJK 줄바꿈 보정 */
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+} 
+  /* identifier */
+  .preview-identifier {
+  margin-bottom:4px;
+  color:#DC0C0C;
+  font-family:"SUIT Variable",sans-serif;
+  font-size:14px;
+  font-weight:600;   /* 600 고정 */
+  line-height:20px;
 }
-.preview-identifier {
-  color: #DC0C0C;
-  font-size: 14px;
-  font-family: SUIT Variable;
-  font-weight: 700;
-  line-height: 20px;
-  word-wrap: break-word;
-}
-.preview-body {
+   .preview-body {
   padding:8px 24px 24px;
   color:#868C98;
-  font:500 14px/20px "SUIT Variable",sans-serif;
+  font-family:"SUIT Variable",sans-serif;
+  font-size:14px;
+  font-weight:400;
+  line-height:20px;
 }
-.preview-condition {
-  margin-top:6px; font-size:13px; color:#5a5f6b;
-}
-.preview-condition ul { margin:6px 0 0 18px; padding:0; }
+    .preview-condition {
+      margin-top:6px; font-size:13px; color:#5a5f6b;
+    }
+    .preview-condition ul { margin:6px 0 0 18px; padding:0; }
 
-.preview-footer {
-  padding:0 24px 24px;
-  display:flex; justify-content:flex-end; gap:8px;
+    .preview-footer {
+      padding:0 24px 24px;
+      display:flex; justify-content:flex-end; gap:8px;
+    }
+   .btn-lg {
+  padding:8px 16px;
+  border-radius:6px;
+  font-family:"SUIT Variable",sans-serif;
+  font-size:14px;
+  font-weight:600; /* 버튼은 600 추천 */
+  line-height:20px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
-.btn-lg {
-  padding:8px 16px; border-radius:6px;
-  font:700 14px/20px "SUIT Variable",sans-serif;
-  display:flex; align-items:center; justify-content:center;
-}
-.btn-secondary { background:#fff; outline:1px #C9CDD7 solid; color:#444855; }
-.btn-primary { background:var(--primary); color:#fff; }
-.btn-danger  { background:var(--danger); color:#fff; }
-</style>
+    .btn-secondary { background:#fff; outline:1px #C9CDD7 solid; color:#444855; }
+    .btn-primary  { background:var(--primary); color:#fff; }
+    .btn-danger   { background:var(--danger); color:#fff; }
+  </style>
 </head>
 <body>
 <div class="wrap">
@@ -157,13 +180,13 @@ textarea { min-height:48px; resize:vertical; }
   <!-- 검사 탭 -->
   <div id="panel-lint" class="panel active">
     <div class="preview-wrap">
-      <!-- 왼쪽 현재 상태(좁은 폭) -->
+      <!-- 왼쪽 현재 상태 -->
       <div class="card">
         <div class="head">
           <div class="chip" id="det-kind">-</div>
           <div class="status" id="det-badges"></div>
         </div>
-        <div class="fields" id="cur-fields">
+        <div class="fields">
           <div class="label">Title</div><input id="cur-title" class="input" readonly>
           <div class="label">Identifier</div><input id="cur-ident" class="input" readonly>
           <div class="label">Description</div><textarea id="cur-desc" class="input" readonly></textarea>
@@ -173,15 +196,17 @@ textarea { min-height:48px; resize:vertical; }
         </div>
       </div>
 
-      <!-- 오른쪽 제안 + 400px 미리보기 -->
+      <!-- 오른쪽 제안 + 미리보기 -->
       <div class="card">
         <div class="head">
           <div class="chip" id="rec-kind">-</div>
           <span class="muted">제안 텍스트</span>
-          <div class="right"><button id="apply" class="btn primary" type="button">적용하기</button></div>
+          <div class="right">
+            <button id="apply" class="btn primary" type="button">적용하기</button>
+          </div>
         </div>
 
-        <!-- 미리보기 -->
+        <!-- 실제 모달 형태 미리보기 -->
         <div class="preview-modal" id="modal-preview">
           <div class="preview-header">
             <div id="pvTitle" class="preview-title">제목이 표시됩니다.</div>
@@ -215,10 +240,15 @@ textarea { min-height:48px; resize:vertical; }
   <!-- AI 탭 -->
   <div id="panel-ai" class="panel">
     <div class="card">
-      <div class="head"><div class="chip">AI 추천</div><span class="muted">상황을 입력하면 적합한 문구를 제안합니다.</span></div>
+      <div class="head">
+        <div class="chip">AI 추천</div>
+        <span class="muted">상황을 입력하면 적합한 문구를 제안합니다.</span>
+      </div>
       <div class="fields">
-        <div class="label">상황</div><textarea id="ai-prompt" class="input"></textarea>
-        <div class="label">결과</div><textarea id="ai-result" class="input" readonly></textarea>
+        <div class="label">상황</div>
+        <textarea id="ai-prompt" class="input"></textarea>
+        <div class="label">결과</div>
+        <textarea id="ai-result" class="input" readonly></textarea>
       </div>
       <div class="row" style="margin-top:8px;">
         <button id="ai-run" class="btn primary" type="button">AI 추천 실행</button>
@@ -228,100 +258,179 @@ textarea { min-height:48px; resize:vertical; }
 </div>
 
 <script>
-/* 탭 */
-document.querySelectorAll('.tab').forEach(t=>{
-  t.addEventListener('click',()=>{
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-    t.classList.add('active');
-    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  // ---------- 헬퍼 ----------
+  const $  = id => document.getElementById(id);
+  const setVal = (id, v) => { const el=$(id); if(!el) return; el.value = v || ''; };
+  const getVal = id => ($(id)?.value || '');
+
+  // ---------- 탭 ----------
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+    });
   });
-});
 
-/* 버튼 */
-const post = (type, payload={}) => parent.postMessage({pluginMessage:{type, ...payload}}, '*');
-document.getElementById('run').onclick   = ()=>post('RUN_SCAN');
-document.getElementById('reset').onclick = ()=>post('RESET');
-document.getElementById('apply').onclick = ()=>post('APPLY_SUGGEST',{values:collectSug()});
-document.getElementById('ai-run').onclick= ()=>post('RUN_AI',{prompt:document.getElementById('ai-prompt').value});
+  // ---------- 버튼 이벤트 ----------
+  const post = (type, payload={}) =>
+    parent.postMessage({ pluginMessage:{ type, ...payload } }, '*');
 
-/* 헬퍼 */
-const $ = id=>document.getElementById(id);
-const v = id=>$(id).value||'';
-const set = (id,val)=>$(id).value = val||'';
-const collectSug=()=>({title:v('sug-title'),ident:v('sug-ident'),desc:v('sug-desc'),cond:v('sug-cond'),left:v('sug-left'),right:v('sug-right')});
+  $('run').onclick   = () => post('RUN_SCAN');
+  $('reset').onclick = () => post('RESET');
+  $('apply').onclick = () => post('APPLY_SUGGEST', { values: collectSug() });
+  $('ai-run').onclick= () => post('RUN_AI', { prompt:getVal('ai-prompt') });
 
-/* 미리보기 렌더 */
-function renderPreview(sug,isDestructive){
-  $('pvTitle').textContent = sug.title || '';
-  const ident = sug.ident || '';
-  $('pvIdent').style.display = ident ? '' : 'none';
-  $('pvIdent').textContent = ident;
-
-  $('pvDesc').textContent = sug.desc || '';
-
-  const cond = (sug.cond||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
-  const wrap = $('pvCond'); const list = $('pvCondList'); list.innerHTML='';
-  cond.forEach(c=>{const li=document.createElement('li'); li.textContent=c; list.appendChild(li);});
-  wrap.style.display = cond.length ? '' : 'none';
-
-  const left=$('pvLeft'), right=$('pvRight');
-  if(sug.left){ left.style.display='flex'; left.textContent=sug.left; } else { left.style.display='none'; }
-  right.textContent = sug.right || '확인';
-  right.className = 'btn-lg '+(isDestructive?'btn-danger':'btn-primary');
-}
-
-/* 플러그인 메시지 */
-onmessage = (e)=>{
-  const msg=e.data.pluginMessage; if(!msg) return;
-  if(msg.type==='SCAN_RESULT'){
-    const sug=msg.suggest||{};
-    const isDestructive=/삭제|폐기|되돌릴 수 없/.test(sug.title||'')||/삭제|폐기/.test(sug.right||'');
-    set('sug-title',sug.title||'');
-    set('sug-ident',sug.identifier||sug.ident||'');
-    set('sug-desc',sug.description||sug.desc||'');
-    set('sug-cond',sug.condition||sug.cond||'');
-    set('sug-left',sug.leftButton||sug.left||'');
-    set('sug-right',sug.rightButton||sug.right||'');
-    renderPreview(collectSug(),isDestructive);
-
-    /* 좌측 현재 상태도 채우기 */
-    set('cur-title', msg.current?.title || '');
-    set('cur-ident', msg.current?.identifier || '');
-    set('cur-desc', msg.current?.description || '');
-    set('cur-cond', msg.current?.condition || '');
-    set('cur-left', msg.current?.leftButton || '');
-    set('cur-right', msg.current?.rightButton || '');
+  function collectSug(){
+    return {
+      title : getVal('sug-title'),
+      ident : getVal('sug-ident'),
+      desc  : getVal('sug-desc'),
+      cond  : getVal('sug-cond'),
+      left  : getVal('sug-left'),
+      right : getVal('sug-right')
+    };
   }
-  if(msg.type==='AI_RESULT'){ $('ai-result').value = msg.text || ''; }
-};
 
-/* 입력시 즉시 미리보기 */
-['sug-title','sug-ident','sug-desc','sug-cond','sug-left','sug-right'].forEach(id=>{
-  $(id).addEventListener('input',()=>{
-    const sug=collectSug();
-    const isDestructive=/삭제|폐기|되돌릴 수 없/.test(sug.title)||/삭제|폐기/.test(sug.right);
-    renderPreview(sug,isDestructive);
-  });
-});
-// ...
-  document.getElementById('ai-run').onclick = () => {
-    const prompt = document.getElementById('ai-prompt').value || '';
-    parent.postMessage({ pluginMessage: { type:'RUN_AI', prompt } }, '*');
-  };
+  // ---------- 미리보기 ----------
+  function renderPreview(sug, isDestructive){
+    $('pvTitle').textContent = sug.title || '';
 
-  onmessage = (e) => {
-    const msg = e.data && e.data.pluginMessage;
-    if (!msg) return;
+    const ident = sug.ident || '';
+    const identEl = $('pvIdent');
+    identEl.style.display = ident ? '' : 'none';
+    identEl.textContent = ident;
 
-    if (msg.type === 'AI_RESULT') {
-      const out = msg.ok ? (msg.text || JSON.stringify(msg)) : `AI 호출 실패: ${msg.error||'unknown'}`;
-      document.getElementById('ai-result').value = out;
+    $('pvDesc').textContent = sug.desc || '';
+
+    const condWrap = $('pvCond');
+    const condList = $('pvCondList');
+    condList.innerHTML = '';
+    const condLines = (sug.cond || '')
+      .split(/\n+/).map(s=>s.trim()).filter(Boolean);
+    condLines.forEach(line=>{
+      const li = document.createElement('li');
+      li.textContent = line;
+      condList.appendChild(li);
+    });
+    condWrap.style.display = condLines.length ? '' : 'none';
+
+    const left = $('pvLeft');
+    const right = $('pvRight');
+    if (sug.left){
+      left.style.display = 'flex';
+      left.textContent = sug.left;
+    } else {
+      left.style.display = 'none';
     }
+    right.textContent = sug.right || '확인';
+    right.className = 'btn-lg ' + (isDestructive ? 'btn-danger' : 'btn-primary');
   }
-    // ... 기존 SCAN_RESULT 처리 그대로
+
+  // 입력 변경 시 즉시 미리보기
+  ['sug-title','sug-ident','sug-desc','sug-cond','sug-left','sug-right'].forEach(id=>{
+    $(id).addEventListener('input',()=>{
+      const sug = collectSug();
+      const danger = /삭제|폐기|되돌릴 수 없/.test(sug.title||'') ||
+                     /삭제|폐기/.test(sug.right||'');
+      renderPreview(sug, danger);
+    });
+  });
+
+  // ---------- 에러 & 뱃지 ----------
+  function setError(id, has){
+    const el = $(id);
+    if(!el) return;
+    if(has) el.classList.add('error'); else el.classList.remove('error');
+  }
+
+  function renderBadges(list){
+    const wrap = $('det-badges');
+    wrap.innerHTML = '';
+    (list||[]).forEach(b=>{
+      const chip = document.createElement('div');
+      chip.className = 'chip ' + (b.level||'');
+      chip.textContent = b.text || '';
+      wrap.appendChild(chip);
+    });
+  }
+
+  // ---------- Figma → UI 메시지 ----------
+  window.onmessage = (event)=>{
+    const msg = event.data && event.data.pluginMessage;
+    if(!msg) return;
+
+    // 스캔 결과
+    if(msg.type === 'SCAN_RESULT'){
+      const cur = msg.current || {};
+      const sug = msg.suggest || {};
+      const errors = msg.errors || {};
+
+      $('det-kind').textContent = msg.kindLabel || '-';
+      $('rec-kind').textContent = msg.recKindLabel || (msg.kindLabel || '-');
+      renderBadges(msg.badges || []);
+
+      // 왼쪽 현재 상태
+      const hasIdent = !!cur.hasIdentifier;
+      const hasCond  = !!cur.hasCondition;
+
+      const curTitle = $('cur-title');
+      curTitle.value = cur.title || '';
+      curTitle.readOnly = true;
+
+      const curIdent = $('cur-ident');
+      curIdent.value = cur.identifier || '';
+      curIdent.readOnly = true;
+      curIdent.disabled = !hasIdent;
+
+      const curDesc = $('cur-desc');
+      curDesc.value = cur.description || '';
+      curDesc.readOnly = true;
+
+      const curCond = $('cur-cond');
+      curCond.value = cur.condition || '';
+      curCond.readOnly = true;
+      curCond.disabled = !hasCond;
+
+      $('cur-left').value  = cur.leftButton  || '';
+      $('cur-right').value = cur.rightButton || '';
+
+      // 에러 표시
+      setError('cur-title', !!errors.title);
+      setError('cur-desc',  !!errors.description);
+      setError('cur-left',  !!errors.leftButton);
+      setError('cur-right', !!errors.rightButton);
+
+      // 오른쪽 제안 필드
+      setVal('sug-title', sug.title || '');
+      setVal('sug-ident', sug.identifier || sug.ident || '');
+      setVal('sug-desc',  sug.description || sug.desc || '');
+      setVal('sug-cond',  sug.condition || sug.cond || '');
+      setVal('sug-left',  sug.leftButton || sug.left || '');
+      setVal('sug-right', sug.rightButton || sug.right || '');
+
+      const previewSug = {
+        title: getVal('sug-title'),
+        ident: getVal('sug-ident'),
+        desc : getVal('sug-desc'),
+        cond : getVal('sug-cond'),
+        left : getVal('sug-left'),
+        right: getVal('sug-right')
+      };
+      const danger = /삭제|폐기|되돌릴 수 없/.test(previewSug.title||'') ||
+                     /삭제|폐기/.test(previewSug.right||'');
+      renderPreview(previewSug, danger);
+    }
+
+    // AI 결과
+    if(msg.type === 'AI_RESULT'){
+      const text = msg.ok
+        ? (msg.text || JSON.stringify(msg))
+        : `AI 호출 실패: ${msg.error || 'unknown'}`;
+      setVal('ai-result', text);
+    }
+  };
 </script>
-
-
 </body>
 </html>
