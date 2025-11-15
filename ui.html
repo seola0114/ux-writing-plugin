@@ -1,436 +1,1804 @@
-<!doctype html>
+<!-- ui.html -->
+<!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <!-- Worker 로만 나가도록 CSP 제한 -->
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none';
-                 img-src data:;
-                 style-src 'unsafe-inline';
-                 script-src 'unsafe-inline';
-                 connect-src https://late-rain-59eb.seola-kim.workers.dev;">
-  <title>UX Writing Lint Helper</title>
-  <style>
-    :root {
-      --ink:#16171B; --muted:#868C98; --line:#E7E7EA;
-      --primary:#287EFF; --danger:#E5484D;
-      --bg:#fff; --chip-bg:#eef1ff; --chip-ink:#3b5bff;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <title>Modal Text Linter</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 12px 16px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SUIT Variable",
+          sans-serif;
+        font-size: 12px;
+        color: #111827;
+      }
 
-   html, body {
-  margin:0; padding:0;
-  font-family:"SUIT Variable",-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;
-  font-size:13px;
-  font-weight:400;   /* 기본 400 고정 */
-  line-height:1.45;
-  color:var(--ink); 
-  background:var(--bg);
-}
+      .root {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        height: 100%;
+      }
 
-    .wrap { padding:12px; }
+      .header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
 
-    .row { display:flex; gap:8px; align-items:center; }
-    .right { margin-left:auto; }
+      .tabs {
+        display: inline-flex;
+        border-radius: 6px;
+        background: #f3f4f6;
+        padding: 2px;
+      }
 
-    .btn {
-      padding:0 12px; height:28px; border:1px solid var(--line);
-      border-radius:6px; background:#fff; cursor:pointer;
-      font:inherit;
-    }
-    .btn.primary { background:#287EFF; color:#fff; border-color:#287EFF; }
-    .btn.ghost { background:transparent; }
-    .btn:disabled { opacity:.5; cursor:not-allowed; }
+      .tab {
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-weight: 400;
+        color: #4b5563;
+      }
+      .tab.active {
+        background: #ffffff;
+        box-shadow: 0 0 0 1px #d1d5db;
+        color: #111827;
+      }
 
-    .tabs { display:flex; gap:8px; margin-bottom:12px; }
-    .tab {
-      height:28px; padding:0 10px; border:1px solid var(--line);
-      border-radius:6px; background:#fff; cursor:pointer;
-    }
-    .tab.active { background:#287EFF; color:#fff; border-color:#287EFF; }
+      .header-actions {
+        display: flex;
+        gap: 4px;
+      }
 
-    .panel { display:none; }
-    .panel.active { display:block; }
+      button {
+        border-radius: 4px;
+        border: 1px solid #d1d5db;
+        padding: 4px 10px;
+        font-size: 11px;
+        background: #ffffff;
+        cursor: pointer;
+        font-weight: 400;
+        color: #111827;
+      }
+      button.primary {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+      }
 
-    .card {
-      border:1px solid var(--line); border-radius:12px;
-      padding:12px; background:#fff;
-    }
+      select {
+        border-radius: 4px;
+        border: 1px solid #d1d5db;
+        padding: 3px 6px;
+        font-size: 11px;
+        background: #ffffff;
+        color: #111827;
+      }
 
-    .head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-    .chip {
-      display:inline-flex; align-items:center;
-      height:22px; padding:0 8px;
-      border-radius:999px; background:var(--chip-bg); color:var(--chip-ink);
-      font-weight:600;
-    }
-    .muted { color:var(--muted); font-size:12px; }
+      .panel-title .panel-actions {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
 
-    .fields {
-      display:grid; grid-template-columns:110px 1fr;
-      gap:8px 12px; align-items:center;
-    }
-    .label { color:#666; }
-    .input, textarea {
-      width:100%; min-height:28px;
-      border:1px solid var(--line); border-radius:6px;
-      padding:6px 8px; font:inherit;
-    }
-    textarea { min-height:48px; resize:vertical; }
+      .body {
+        flex: 1;
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+      }
 
-    .input[disabled], textarea[disabled] {
-      background:#f5f5f5; color:#aaa;
-    }
-    .input.error, textarea.error {
-      border-color:var(--danger); background:#fff6f6;
-    }
+      .panel {
+        flex: 0 0 320px; /* 왼쪽 조금 더 좁게 */
+        display: flex;
+        flex-direction: column;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        padding: 8px 10px;
+        gap: 6px;
+        min-height: 300px;
+      }
+      .panel.right {
+        flex: 1 1 auto;
+      }
 
-    .status { display:flex; gap:6px; flex-wrap:wrap; }
-    .status .chip.ok{ background:#e7f8f0; color:#13795b; }
-    .status .chip.warn{ background:#fff6e6; color:#a35b00; }
-    .status .chip.fail{ background:#ffe8ea; color:#b3261e; }
+      .panel-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: #4b5563;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
 
-    /* ▶ 왼쪽은 상대적으로 좁게, 오른쪽은 400px 모달이 들어가도록 */
-    .preview-wrap {
-      display:grid;
-      grid-template-columns: minmax(260px, 320px) 1fr;
-      gap:16px;
-      align-items:start;
-    }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .field-label {
+        font-size: 11px;
+        color: #6b7280;
+        font-weight: 400;
+      }
+      .field-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .field-value {
+        flex: 1;
+        min-height: 20px;
+        padding: 3px 6px;
+        border-radius: 4px;
+        border: 1px solid #e5e7eb;
+        background: #f9fafb;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #111827;
+        font-weight: 400;
+        overflow-wrap: break-word;
+        word-break: keep-all;
+      }
 
-    /* ------------------- 미리보기 모달 ------------------- */
-    .preview-modal {
-      width:400px;
-      border-radius:12px;
-      overflow:hidden;
-      border:1px solid var(--line);
-      background:#fff;
-      display:flex;
-      flex-direction:column;
-    }
-    .preview-header {
-      padding:24px 24px 0 24px;
-      display:flex; align-items:center; gap:8px;
-    }
-    .preview-title {
-  max-width:352px;
-  color:var(--ink);
-  font-family:"SUIT Variable",sans-serif;
-  font-size:18px;
-  font-weight:700; /* 제목은 굵게 700 */
-  line-height:24px;
-  white-space:normal;
-  word-break:keep-all;
-  overflow-wrap:anywhere;
-} 
-  /* identifier */
-  .preview-identifier {
-  margin-bottom:4px;
-  color:#DC0C0C;
-  font-family:"SUIT Variable",sans-serif;
-  font-size:14px;
-  font-weight:600;   /* 600 고정 */
-  line-height:20px;
-}
-   .preview-body {
-  padding:8px 24px 24px;
-  color:#868C98;
-  font-family:"SUIT Variable",sans-serif;
-  font-size:14px;
-  font-weight:400;
-  line-height:20px;
-}
-    .preview-condition {
-      margin-top:6px; font-size:13px; color:#5a5f6b;
-    }
-    .preview-condition ul { margin:6px 0 0 18px; padding:0; }
+      .field-value.error {
+        border-color: #f97373;
+        background: #fef2f2;
+      }
+      .field-value.disabled {
+        opacity: 0.5;
+      }
 
-    .preview-footer {
-      padding:0 24px 24px;
-      display:flex; justify-content:flex-end; gap:8px;
-    }
-   .btn-lg {
-  padding:8px 16px;
-  border-radius:6px;
-  font-family:"SUIT Variable",sans-serif;
-  font-size:14px;
-  font-weight:600; /* 버튼은 600 추천 */
-  line-height:20px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-    .btn-secondary { background:#fff; outline:1px #C9CDD7 solid; color:#444855; }
-    .btn-primary  { background:var(--primary); color:#fff; }
-    .btn-danger   { background:var(--danger); color:#fff; }
-  </style>
-</head>
-<body>
-<div class="wrap">
-  <div class="row">
-    <div class="tabs">
-      <button class="tab active" data-tab="lint" type="button">검사</button>
-      <button class="tab" data-tab="ai" type="button">AI 텍스트 추천</button>
-    </div>
-    <div class="right row">
-      <button id="reset" class="btn ghost" type="button">초기화</button>
-      <button id="run" class="btn primary" type="button">검사하기</button>
-    </div>
-  </div>
+      .field-value.editable {
+        background: #ffffff;
+      }
 
-  <!-- 검사 탭 -->
-  <div id="panel-lint" class="panel active">
-    <div class="preview-wrap">
-      <!-- 왼쪽 현재 상태 -->
-      <div class="card">
-        <div class="head">
-          <div class="chip" id="det-kind">-</div>
-          <div class="status" id="det-badges"></div>
+      textarea {
+        width: 100%;
+        min-height: 80px;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+        padding: 6px 8px;
+        font-size: 11px;
+        resize: vertical;
+        font-family: inherit;
+        font-weight: 400;
+      }
+
+      #src-identifier,
+      #sug-identifier,
+      #ai-identifier,
+      #db-identifier,
+      #ai-preview-identifier,
+      #db-preview-identifier {
+        color: #dc0c0c;
+      }
+      .field-value.diff-current {
+        color: #dc2626;
+      }
+      .field-value.diff-suggest {
+        color: #047857;
+      }
+
+      .status-bar {
+        font-size: 11px;
+        color: #6b7280;
+        margin-top: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .status-bar .error {
+        color: #dc2626;
+      }
+
+      .error {
+        color: #dc2626;
+      }
+
+      .footer {
+        margin-top: 6px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 4px;
+      }
+
+      /* 모달 미리보기 카드 */
+      .modal-preview {
+        width: 400px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        display: flex;
+        flex-direction: column;
+      }
+      .modal-preview-header {
+        padding: 16px 20px 0 20px;
+        font-size: 16px;
+        line-height: 1.4;
+        font-weight: 700; /* 타이틀만 700 */
+        color: #111827;
+        word-break: keep-all;
+        overflow-wrap: break-word;
+      }
+      .modal-preview-body {
+        padding: 8px 20px 16px 20px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #6b7280;
+        font-weight: 400;
+        word-break: keep-all;
+        overflow-wrap: break-word;
+      }
+      .modal-preview-condition {
+        padding: 0 20px 4px 20px;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #4b5563;
+        font-weight: 400;
+        word-break: keep-all;
+        overflow-wrap: break-word;
+      }
+      .modal-preview-footer {
+        padding: 0 20px 16px 20px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .modal-btn {
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.5;
+        font-weight: 600;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        color: #374151;
+        cursor: default;
+      }
+      .modal-btn.primary {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+      }
+      .modal-btn.destructive {
+        background: #dc2f0c;
+        border-color: #dc2f0c;
+        color: #ffffff;
+      }
+
+      .pill {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        border: 1px solid #e5e7eb;
+        background: #f9fafb;
+        color: #6b7280;
+        font-weight: 400;
+      }
+
+      .ai-layout {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        width: 100%;
+      }
+      .ai-left {
+        flex: 1 1 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ai-right {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .db-layout {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        width: 100%;
+      }
+      .db-left {
+        flex: 1 1 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .db-right {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .toast-preview {
+        width: 320px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        background: #111827;
+        color: #f9fafb;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .toast-preview .toast-title {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .toast-preview .toast-action {
+        margin-left: auto;
+        font-weight: 600;
+        color: #93c5fd;
+        cursor: default;
+      }
+
+      .spellcheck-panel {
+        margin-top: 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .spellcheck-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 11px;
+      }
+      .spellcheck-item {
+        padding: 4px 6px;
+        border-radius: 6px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+      }
+      .spellcheck-item.error {
+        border-color: #fca5a5;
+        background: #fef2f2;
+        color: #b91c1c;
+      }
+      .spellcheck-item.ok {
+        border-color: #a7f3d0;
+        background: #ecfdf5;
+        color: #065f46;
+      }
+      .rule-hint {
+        font-size: 10px;
+        color: #dc2626;
+        margin-top: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="root">
+      <div class="header-row">
+        <div class="tabs">
+          <button id="tab-lint" class="tab active">검사</button>
+          <button id="tab-ai" class="tab">AI 텍스트 추천</button>
+          <button id="tab-db" class="tab">DB 텍스트 추천</button>
         </div>
-        <div class="fields">
-          <div class="label">Title</div><input id="cur-title" class="input" readonly>
-          <div class="label">Identifier</div><input id="cur-ident" class="input" readonly>
-          <div class="label">Description</div><textarea id="cur-desc" class="input" readonly></textarea>
-          <div class="label">Condition</div><textarea id="cur-cond" class="input" readonly></textarea>
-          <div class="label">Left button</div><input id="cur-left" class="input" readonly>
-          <div class="label">Right button</div><input id="cur-right" class="input" readonly>
+        <div class="header-actions">
+          <button id="btn-reset">초기화</button>
+          <button id="btn-check" class="primary">검사</button>
         </div>
       </div>
 
-      <!-- 오른쪽 제안 + 미리보기 -->
-      <div class="card">
-        <div class="head">
-          <div class="chip" id="rec-kind">-</div>
-          <span class="muted">제안 텍스트</span>
-          <div class="right">
-            <button id="apply" class="btn primary" type="button">적용하기</button>
+      <!-- 탭: 검사 -->
+      <div id="tab-lint-panel" class="body">
+        <div class="panel">
+          <div class="panel-title">
+            <span>현재 상태</span>
+            <span id="lint-kind-pill" class="pill">-</span>
+          </div>
+          <div class="field">
+            <div class="field-label">Title</div>
+            <div id="src-title" class="field-value"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Identifier</div>
+            <div id="src-identifier" class="field-value"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Description</div>
+            <div id="src-description" class="field-value"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Condition</div>
+            <div id="src-condition" class="field-value"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Left button</div>
+            <div id="src-left-btn" class="field-value"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Right button</div>
+            <div id="src-right-btn" class="field-value"></div>
           </div>
         </div>
 
-        <!-- 실제 모달 형태 미리보기 -->
-        <div class="preview-modal" id="modal-preview">
-          <div class="preview-header">
-            <div id="pvTitle" class="preview-title">제목이 표시됩니다.</div>
+        <div class="panel right">
+          <div class="panel-title">
+            <span>제안</span>
+            <span id="lint-subtype-pill" class="pill">-</span>
           </div>
-          <div class="preview-body">
-            <div id="pvIdent" class="preview-identifier" style="display:none;">1행</div>
-            <div id="pvDesc">본문이 표시됩니다.</div>
-            <div id="pvCond" class="preview-condition" style="display:none;">
-              <ul id="pvCondList"></ul>
+          <div class="field">
+            <div class="field-label">Title</div>
+            <div id="sug-title" class="field-value editable" contenteditable="true"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Identifier</div>
+            <div
+              id="sug-identifier"
+              class="field-value editable"
+              contenteditable="true"
+            ></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Description</div>
+            <div
+              id="sug-description"
+              class="field-value editable"
+              contenteditable="true"
+            ></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Condition</div>
+            <div
+              id="sug-condition"
+              class="field-value editable"
+              contenteditable="true"
+            ></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Left button</div>
+            <div
+              id="sug-left-btn"
+              class="field-value editable"
+              contenteditable="true"
+            ></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Right button</div>
+            <div
+              id="sug-right-btn"
+              class="field-value editable"
+              contenteditable="true"
+            ></div>
+          </div>
+          <div id="cancel-rule-hint" class="rule-hint" style="display: none"></div>
+
+          <div class="footer">
+            <button id="btn-apply" class="primary">적용하기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭: AI 텍스트 추천 -->
+      <div id="tab-ai-panel" class="body" style="display: none">
+        <div class="panel right" style="flex: 1 1 auto">
+          <div class="panel-title">
+            <span>AI 텍스트 추천</span>
+          </div>
+          <div class="ai-layout">
+            <div class="ai-left">
+              <div class="field">
+                <div class="field-label">상황 설명</div>
+                <textarea
+                  id="ai-prompt"
+                  placeholder="예) 청구 고객 변경 결재가 필요 없는 상황을 모달로 안내하고 싶어요."
+                ></textarea>
+              </div>
+              <div class="footer" style="justify-content: flex-start">
+                <button id="btn-ai-suggest" class="primary">AI 텍스트 추천</button>
+              </div>
+
+              <div class="field">
+                <div class="field-label">추천 결과 (텍스트)</div>
+                <div class="field-value">
+                  <div><strong>Title</strong> : <span id="ai-title"></span></div>
+                  <div>
+                    <strong>Identifier</strong> :
+                    <span id="ai-identifier"></span>
+                  </div>
+                  <div>
+                    <strong>Description</strong> :
+                    <span id="ai-description"></span>
+                  </div>
+                  <div>
+                    <strong>Condition</strong> :
+                    <span id="ai-condition"></span>
+                  </div>
+                  <div>
+                    <strong>Left button</strong> :
+                    <span id="ai-left-btn"></span>
+                  </div>
+                  <div>
+                    <strong>Right button</strong> :
+                    <span id="ai-right-btn"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="ai-right">
+              <div class="field-label">미리보기</div>
+              <div class="modal-preview" id="ai-modal-preview">
+                <div id="ai-preview-title" class="modal-preview-header">
+                  제목이 여기에 표시됩니다.
+                </div>
+                <div id="ai-preview-identifier" class="modal-preview-condition"></div>
+                <div id="ai-preview-description" class="modal-preview-body">
+                  설명이 여기에 표시됩니다.
+                </div>
+                <div id="ai-preview-condition" class="modal-preview-condition"></div>
+                <div class="modal-preview-footer">
+                  <button id="ai-preview-left" class="modal-btn">
+                    취소
+                  </button>
+                  <button id="ai-preview-right" class="modal-btn primary">
+                    확인
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="preview-footer">
-            <div id="pvLeft" class="btn-lg btn-secondary" style="display:none;">취소</div>
-            <div id="pvRight" class="btn-lg btn-primary">확인</div>
+
+          <div class="status-bar">
+            <span id="status-text"></span>
+            <span id="status-error" class="error"></span>
           </div>
         </div>
+      </div>
 
-        <!-- 제안 필드 -->
-        <div class="fields" style="margin-top:12px;">
-          <div class="label">Title</div><input id="sug-title" class="input">
-          <div class="label">Identifier</div><input id="sug-ident" class="input">
-          <div class="label">Description</div><textarea id="sug-desc" class="input"></textarea>
-          <div class="label">Condition</div><textarea id="sug-cond" class="input"></textarea>
-          <div class="label">Left button</div><input id="sug-left" class="input">
-          <div class="label">Right button</div><input id="sug-right" class="input">
+      <!-- 탭: DB 텍스트 추천 -->
+      <div id="tab-db-panel" class="body" style="display: none">
+        <div class="panel right" style="flex: 1 1 auto">
+          <div class="panel-title">
+            <span>DB 텍스트 추천</span>
+            <div class="panel-actions">
+              <label for="db-component" class="field-label" style="margin: 0">컴포넌트</label>
+              <select id="db-component">
+                <option value="modal">Modal</option>
+                <option value="toast">Toast</option>
+              </select>
+              <button id="btn-db-suggest" class="primary">DB 추천</button>
+            </div>
+          </div>
+          <div class="db-layout">
+            <div class="db-left">
+              <div class="field">
+                <div class="field-label">상황 설명</div>
+                <textarea
+                  id="db-prompt"
+                  placeholder="예) 상차 정보를 잘못 입력해 삭제 안내가 필요한 모달."
+                ></textarea>
+              </div>
+              <div class="field">
+                <div class="field-label">추천 결과 (텍스트)</div>
+                <div class="field-value">
+                  <div><strong>Title</strong> : <span id="db-title"></span></div>
+                  <div>
+                    <strong>Identifier</strong> :
+                    <span id="db-identifier"></span>
+                  </div>
+                  <div>
+                    <strong>Description</strong> :
+                    <span id="db-description"></span>
+                  </div>
+                  <div>
+                    <strong>Condition</strong> :
+                    <span id="db-condition"></span>
+                  </div>
+                  <div>
+                    <strong>Left button</strong> :
+                    <span id="db-left-btn"></span>
+                  </div>
+                  <div>
+                    <strong>Right button</strong> :
+                    <span id="db-right-btn"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="db-right">
+              <div class="field-label">미리보기</div>
+              <div class="modal-preview" id="db-preview-modal">
+                <div id="db-preview-title" class="modal-preview-header"></div>
+                <div id="db-preview-identifier" class="modal-preview-condition"></div>
+                <div id="db-preview-description" class="modal-preview-body"></div>
+                <div id="db-preview-condition" class="modal-preview-condition"></div>
+                <div class="modal-preview-footer">
+                  <button id="db-preview-left" class="modal-btn">취소</button>
+                  <button id="db-preview-right" class="modal-btn primary">확인</button>
+                </div>
+              </div>
+              <div class="toast-preview" id="db-preview-toast" style="display: none">
+                <div class="toast-title" id="db-toast-title">토스트 메시지</div>
+                <div class="toast-body" id="db-toast-body">콘텐츠</div>
+                <div class="toast-action" id="db-toast-action">확인</div>
+              </div>
+            </div>
+          </div>
+          <div class="footer" style="justify-content: space-between; align-items: center">
+            <div>
+              <span id="db-status-text"></span>
+              <span id="db-status-error" class="error"></span>
+            </div>
+            <div class="header-actions">
+              <button id="btn-db-apply" class="primary">DB 제안 적용</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="spellcheck-panel" class="spellcheck-panel">
+        <div class="panel-title">
+          <span>맞춤법 검사 결과</span>
+          <span id="spellcheck-status" class="spellcheck-status">-</span>
+        </div>
+        <div id="spellcheck-list" class="spellcheck-list">
+          <div class="spellcheck-item">검사 결과가 여기에 표시됩니다.</div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- AI 탭 -->
-  <div id="panel-ai" class="panel">
-    <div class="card">
-      <div class="head">
-        <div class="chip">AI 추천</div>
-        <span class="muted">상황을 입력하면 적합한 문구를 제안합니다.</span>
-      </div>
-      <div class="fields">
-        <div class="label">상황</div>
-        <textarea id="ai-prompt" class="input"></textarea>
-        <div class="label">결과</div>
-        <textarea id="ai-result" class="input" readonly></textarea>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <button id="ai-run" class="btn primary" type="button">AI 추천 실행</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-  // ---------- 헬퍼 ----------
-  const $  = id => document.getElementById(id);
-  const setVal = (id, v) => { const el=$(id); if(!el) return; el.value = v || ''; };
-  const getVal = id => ($(id)?.value || '');
-
-  // ---------- 탭 ----------
-  document.querySelectorAll('.tab').forEach(t=>{
-    t.addEventListener('click',()=>{
-      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-      t.classList.add('active');
-      document.getElementById('panel-'+t.dataset.tab).classList.add('active');
-    });
-  });
-
-  // ---------- 버튼 이벤트 ----------
-  const post = (type, payload={}) =>
-    parent.postMessage({ pluginMessage:{ type, ...payload } }, '*');
-
-  $('run').onclick   = () => post('RUN_SCAN');
-  $('reset').onclick = () => post('RESET');
-  $('apply').onclick = () => post('APPLY_SUGGEST', { values: collectSug() });
-  $('ai-run').onclick= () => post('RUN_AI', { prompt:getVal('ai-prompt') });
-
-  function collectSug(){
-    return {
-      title : getVal('sug-title'),
-      ident : getVal('sug-ident'),
-      desc  : getVal('sug-desc'),
-      cond  : getVal('sug-cond'),
-      left  : getVal('sug-left'),
-      right : getVal('sug-right')
-    };
-  }
-
-  // ---------- 미리보기 ----------
-  function renderPreview(sug, isDestructive){
-    $('pvTitle').textContent = sug.title || '';
-
-    const ident = sug.ident || '';
-    const identEl = $('pvIdent');
-    identEl.style.display = ident ? '' : 'none';
-    identEl.textContent = ident;
-
-    $('pvDesc').textContent = sug.desc || '';
-
-    const condWrap = $('pvCond');
-    const condList = $('pvCondList');
-    condList.innerHTML = '';
-    const condLines = (sug.cond || '')
-      .split(/\n+/).map(s=>s.trim()).filter(Boolean);
-    condLines.forEach(line=>{
-      const li = document.createElement('li');
-      li.textContent = line;
-      condList.appendChild(li);
-    });
-    condWrap.style.display = condLines.length ? '' : 'none';
-
-    const left = $('pvLeft');
-    const right = $('pvRight');
-    if (sug.left){
-      left.style.display = 'flex';
-      left.textContent = sug.left;
-    } else {
-      left.style.display = 'none';
-    }
-    right.textContent = sug.right || '확인';
-    right.className = 'btn-lg ' + (isDestructive ? 'btn-danger' : 'btn-primary');
-  }
-
-  // 입력 변경 시 즉시 미리보기
-  ['sug-title','sug-ident','sug-desc','sug-cond','sug-left','sug-right'].forEach(id=>{
-    $(id).addEventListener('input',()=>{
-      const sug = collectSug();
-      const danger = /삭제|폐기|되돌릴 수 없/.test(sug.title||'') ||
-                     /삭제|폐기/.test(sug.right||'');
-      renderPreview(sug, danger);
-    });
-  });
-
-  // ---------- 에러 & 뱃지 ----------
-  function setError(id, has){
-    const el = $(id);
-    if(!el) return;
-    if(has) el.classList.add('error'); else el.classList.remove('error');
-  }
-
-  function renderBadges(list){
-    const wrap = $('det-badges');
-    wrap.innerHTML = '';
-    (list||[]).forEach(b=>{
-      const chip = document.createElement('div');
-      chip.className = 'chip ' + (b.level||'');
-      chip.textContent = b.text || '';
-      wrap.appendChild(chip);
-    });
-  }
-
-  // ---------- Figma → UI 메시지 ----------
-  window.onmessage = (event)=>{
-    const msg = event.data && event.data.pluginMessage;
-    if(!msg) return;
-
-    // 스캔 결과
-    if(msg.type === 'SCAN_RESULT'){
-      const cur = msg.current || {};
-      const sug = msg.suggest || {};
-      const errors = msg.errors || {};
-
-      $('det-kind').textContent = msg.kindLabel || '-';
-      $('rec-kind').textContent = msg.recKindLabel || (msg.kindLabel || '-');
-      renderBadges(msg.badges || []);
-
-      // 왼쪽 현재 상태
-      const hasIdent = !!cur.hasIdentifier;
-      const hasCond  = !!cur.hasCondition;
-
-      const curTitle = $('cur-title');
-      curTitle.value = cur.title || '';
-      curTitle.readOnly = true;
-
-      const curIdent = $('cur-ident');
-      curIdent.value = cur.identifier || '';
-      curIdent.readOnly = true;
-      curIdent.disabled = !hasIdent;
-
-      const curDesc = $('cur-desc');
-      curDesc.value = cur.description || '';
-      curDesc.readOnly = true;
-
-      const curCond = $('cur-cond');
-      curCond.value = cur.condition || '';
-      curCond.readOnly = true;
-      curCond.disabled = !hasCond;
-
-      $('cur-left').value  = cur.leftButton  || '';
-      $('cur-right').value = cur.rightButton || '';
-
-      // 에러 표시
-      setError('cur-title', !!errors.title);
-      setError('cur-desc',  !!errors.description);
-      setError('cur-left',  !!errors.leftButton);
-      setError('cur-right', !!errors.rightButton);
-
-      // 오른쪽 제안 필드
-      setVal('sug-title', sug.title || '');
-      setVal('sug-ident', sug.identifier || sug.ident || '');
-      setVal('sug-desc',  sug.description || sug.desc || '');
-      setVal('sug-cond',  sug.condition || sug.cond || '');
-      setVal('sug-left',  sug.leftButton || sug.left || '');
-      setVal('sug-right', sug.rightButton || sug.right || '');
-
-      const previewSug = {
-        title: getVal('sug-title'),
-        ident: getVal('sug-ident'),
-        desc : getVal('sug-desc'),
-        cond : getVal('sug-cond'),
-        left : getVal('sug-left'),
-        right: getVal('sug-right')
+    <script src="modal_toast_text_database.js"></script>
+    <script>
+      var latestScanSource = null;
+      var latestComponentKind = "modal";
+      var latestDbSuggestion = null;
+      var DB_TEMPLATES = Array.isArray(window.MODAL_TOAST_TEMPLATES)
+        ? window.MODAL_TOAST_TEMPLATES.filter(function (item) {
+            return item && Object.keys(item).length > 0;
+          })
+        : [];
+      var DB_DEFAULTS = {
+        modal: {
+          title: "입력 내용을 확인해 주세요.",
+          identifier: "",
+          description: "변경 사항을 적용하기 전에 다시 한 번 확인해 주세요.",
+          condition: "",
+          leftButton: "취소",
+          rightButton: "확인",
+        },
+        toast: {
+          title: "작업이 완료됐어요.",
+          identifier: "",
+          description: "조치가 정상적으로 처리됐습니다.",
+          condition: "",
+          leftButton: "",
+          rightButton: "확인",
+        },
       };
-      const danger = /삭제|폐기|되돌릴 수 없/.test(previewSug.title||'') ||
-                     /삭제|폐기/.test(previewSug.right||'');
-      renderPreview(previewSug, danger);
-    }
 
-    // AI 결과
-    if(msg.type === 'AI_RESULT'){
-      const text = msg.ok
-        ? (msg.text || JSON.stringify(msg))
-        : `AI 호출 실패: ${msg.error || 'unknown'}`;
-      setVal('ai-result', text);
+      // ---------- 탭 전환 ----------
+      var tabLintBtn = document.getElementById("tab-lint");
+      var tabAiBtn = document.getElementById("tab-ai");
+      var tabDbBtn = document.getElementById("tab-db");
+      var tabLintPanel = document.getElementById("tab-lint-panel");
+      var tabAiPanel = document.getElementById("tab-ai-panel");
+      var tabDbPanel = document.getElementById("tab-db-panel");
+
+      function activateTab(name) {
+        tabLintBtn.classList.toggle("active", name === "lint");
+        tabAiBtn.classList.toggle("active", name === "ai");
+        tabDbBtn.classList.toggle("active", name === "db");
+        tabLintPanel.style.display = name === "lint" ? "flex" : "none";
+        tabAiPanel.style.display = name === "ai" ? "flex" : "none";
+        tabDbPanel.style.display = name === "db" ? "flex" : "none";
+      }
+
+      tabLintBtn.addEventListener("click", function () {
+        activateTab("lint");
+      });
+      tabAiBtn.addEventListener("click", function () {
+        activateTab("ai");
+      });
+      tabDbBtn.addEventListener("click", function () {
+        activateTab("db");
+      });
+
+      // ---------- 버튼 참조 ----------
+      var btnReset = document.getElementById("btn-reset");
+      var btnCheck = document.getElementById("btn-check");
+      var btnApply = document.getElementById("btn-apply");
+      var btnAiSuggest = document.getElementById("btn-ai-suggest");
+      var btnDbSuggest = document.getElementById("btn-db-suggest");
+      var btnDbApply = document.getElementById("btn-db-apply");
+      var dbComponentSelect = document.getElementById("db-component");
+      var dbPromptInput = document.getElementById("db-prompt");
+
+      var statusText = document.getElementById("status-text");
+      var statusError = document.getElementById("status-error");
+      var dbStatusText = document.getElementById("db-status-text");
+      var dbStatusError = document.getElementById("db-status-error");
+      var spellcheckStatus = document.getElementById("spellcheck-status");
+      var spellcheckList = document.getElementById("spellcheck-list");
+      var cancelRuleHint = document.getElementById("cancel-rule-hint");
+      var progressTickers = {};
+      var AI_PROGRESS_ESTIMATE = 15000;
+      var SPELLCHECK_FIELD_ESTIMATE = 4;
+      var spellcheckPending = { lint: false, ai: false };
+      var spellcheckProgressMeta = null;
+
+      // ---------- 검사 탭 DOM ----------
+      var srcIds = {
+        title: "src-title",
+        identifier: "src-identifier",
+        description: "src-description",
+        condition: "src-condition",
+        leftButton: "src-left-btn",
+        rightButton: "src-right-btn",
+      };
+      var sugIds = {
+        title: "sug-title",
+        identifier: "sug-identifier",
+        description: "sug-description",
+        condition: "sug-condition",
+        leftButton: "sug-left-btn",
+        rightButton: "sug-right-btn",
+      };
+
+      function setField(id, value, opts) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = value || "";
+        el.classList.remove("error", "disabled");
+        if (opts && opts.error) el.classList.add("error");
+        if (opts && opts.disabled) el.classList.add("disabled");
+      }
+
+      function updateDiffHighlights() {
+        var keys = ["title", "identifier", "description", "condition", "leftButton", "rightButton"];
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i];
+          var srcEl = document.getElementById(srcIds[key]);
+          var sugEl = document.getElementById(sugIds[key]);
+          if (!srcEl || !sugEl) continue;
+          var srcValue = (srcEl.textContent || "").trim();
+          var sugValue = (sugEl.textContent || "").trim();
+          var changed = srcValue.length > 0 && sugValue.length > 0 && srcValue !== sugValue;
+          srcEl.classList.toggle("diff-current", changed);
+          sugEl.classList.toggle("diff-suggest", changed);
+        }
+      }
+
+      function attachSuggestionFieldListeners() {
+        Object.keys(sugIds).forEach(function (key) {
+          var el = document.getElementById(sugIds[key]);
+          if (!el) return;
+          ["input", "blur"].forEach(function (evt) {
+            el.addEventListener(evt, function () {
+              updateDiffHighlights();
+              if (
+                key === "leftButton" ||
+                key === "title" ||
+                key === "description" ||
+                key === "condition" ||
+                key === "rightButton"
+              ) {
+                enforceCancelDestructiveRule();
+              }
+            });
+          });
+        });
+      }
+      attachSuggestionFieldListeners();
+
+      function collectSuggestionFields() {
+        return [
+          { field: "title", label: "Title", text: document.getElementById(sugIds.title).textContent.trim() },
+          { field: "identifier", label: "Identifier", text: document.getElementById(sugIds.identifier).textContent.trim() },
+          { field: "description", label: "Description", text: document.getElementById(sugIds.description).textContent.trim() },
+          { field: "condition", label: "Condition", text: document.getElementById(sugIds.condition).textContent.trim() },
+          { field: "leftButton", label: "Left button", text: document.getElementById(sugIds.leftButton).textContent.trim() },
+          { field: "rightButton", label: "Right button", text: document.getElementById(sugIds.rightButton).textContent.trim() },
+        ];
+      }
+
+      function startProgressTicker(key, duration, onUpdate) {
+        stopProgressTicker(key);
+        if (!duration || duration < 1000) duration = 1000;
+        var start = Date.now();
+        function tick(forceFinal) {
+          var elapsed = Date.now() - start;
+          var percent = forceFinal
+            ? 100
+            : Math.min(99, Math.round((elapsed / duration) * 100));
+          var remaining = Math.max(0, duration - elapsed);
+          var eta = forceFinal ? 0 : Math.max(0, Math.ceil(remaining / 1000));
+          onUpdate(percent, eta, !!forceFinal);
+        }
+        tick(false);
+        var interval = setInterval(function () {
+          tick(false);
+        }, 350);
+        progressTickers[key] = {
+          interval: interval,
+          tick: tick,
+        };
+      }
+
+      function stopProgressTicker(key) {
+        var tracker = progressTickers[key];
+        if (!tracker) return;
+        clearInterval(tracker.interval);
+        delete progressTickers[key];
+      }
+
+      function markSpellcheckPending(key, enabled) {
+        if (!spellcheckPending) return;
+        spellcheckPending[key] = !!enabled;
+      }
+
+      function runSpellcheckIfPending(key, label) {
+        if (!spellcheckPending || !spellcheckPending[key]) return;
+        spellcheckPending[key] = false;
+        requestSpellcheck(label);
+      }
+
+      function clearSpellcheckPending() {
+        spellcheckPending.lint = false;
+        spellcheckPending.ai = false;
+      }
+
+      function requestSpellcheck(reasonLabel) {
+        var fields = collectSuggestionFields();
+        var filled = fields.filter(function (f) {
+          return f.text && f.text.length > 0;
+        });
+        if (!filled.length) {
+          spellcheckStatus.textContent = "검사할 텍스트가 없습니다.";
+          if (spellcheckList) {
+            spellcheckList.innerHTML = "";
+            var empty = document.createElement("div");
+            empty.className = "spellcheck-item ok";
+            empty.textContent = "검사할 텍스트가 없습니다.";
+            spellcheckList.appendChild(empty);
+          }
+          return;
+        }
+        spellcheckProgressMeta = {
+          totalTargets: filled.length,
+          completedTargets: 0,
+          startedAt: Date.now(),
+          reasonLabel: reasonLabel || "",
+        };
+        if (spellcheckList) {
+          spellcheckList.innerHTML = "";
+          var progressItem = document.createElement("div");
+          progressItem.className = "spellcheck-item";
+          progressItem.textContent = "맞춤법 검사 진행 중...";
+          spellcheckList.appendChild(progressItem);
+        }
+        updateSpellcheckProgressStatus();
+        parent.postMessage(
+          {
+            pluginMessage: { type: "SPELLCHECK_REQUEST", fields: filled },
+          },
+          "*"
+        );
+      }
+
+      function updateSpellcheckProgressStatus() {
+        if (!spellcheckProgressMeta || !spellcheckProgressMeta.totalTargets) return;
+        var total = spellcheckProgressMeta.totalTargets;
+        var completed = Math.min(
+          spellcheckProgressMeta.completedTargets || 0,
+          total
+        );
+        var percent = total ? Math.round((completed / total) * 100) : 100;
+        percent = Math.min(percent, 99);
+        var elapsed = Math.max(0, (Date.now() - spellcheckProgressMeta.startedAt) / 1000);
+        var avgPerField =
+          completed > 0
+            ? Math.max(0.5, elapsed / completed)
+            : SPELLCHECK_FIELD_ESTIMATE;
+        var remainingFields = Math.max(0, total - completed);
+        var etaSeconds = Math.ceil(avgPerField * remainingFields);
+        if (etaSeconds <= 0) etaSeconds = 1;
+        var label = spellcheckProgressMeta.reasonLabel
+          ? spellcheckProgressMeta.reasonLabel + " 맞춤법 검사"
+          : "맞춤법 검사";
+        var etaText = remainingFields === 0 ? "곧 완료" : "약 " + etaSeconds + "초 남음";
+        spellcheckStatus.textContent =
+          label + " 진행 중... " + percent + "% (" + etaText + ")";
+      }
+
+      function clearSpellcheckProgress() {
+        spellcheckProgressMeta = null;
+      }
+
+      function renderSpellcheckResult(results) {
+        if (!spellcheckList) return;
+        spellcheckList.innerHTML = "";
+        if (!results || !results.length) {
+          var empty = document.createElement("div");
+          empty.className = "spellcheck-item ok";
+          empty.textContent = "검사할 텍스트가 없습니다.";
+          spellcheckList.appendChild(empty);
+          spellcheckStatus.textContent = "-";
+          return;
+        }
+        var totalIssues = 0;
+        results.forEach(function (entry) {
+          var issues = entry.errors || [];
+          if (!issues.length) {
+            var okItem = document.createElement("div");
+            okItem.className = "spellcheck-item ok";
+            okItem.textContent = entry.label + ": 문제가 발견되지 않았습니다.";
+            spellcheckList.appendChild(okItem);
+            return;
+          }
+          issues.forEach(function (issue) {
+            totalIssues++;
+            var item = document.createElement("div");
+            item.className = "spellcheck-item error";
+            var suggestion = issue.suggestion || "";
+            var help = issue.help ? " (" + issue.help + ")" : "";
+            item.textContent =
+              entry.label +
+              ": \"" +
+              (issue.error || "") +
+              "\" → \"" +
+              suggestion +
+              "\"" +
+              help;
+            spellcheckList.appendChild(item);
+          });
+        });
+        if (totalIssues === 0) {
+          var ok = document.createElement("div");
+          ok.className = "spellcheck-item ok";
+          ok.textContent = "모든 텍스트가 적절합니다.";
+          spellcheckList.appendChild(ok);
+          spellcheckStatus.textContent = "문제 없음";
+        } else {
+          spellcheckStatus.textContent = totalIssues + "건 발견됨";
+        }
+      }
+
+      function pickPrimarySuggestionText(raw) {
+        if (raw === null || typeof raw === "undefined") return "";
+        var normalized = String(raw);
+        var parts = normalized.split(/[\|,]/);
+        if (parts.length) {
+          return parts[0].trim();
+        }
+        return normalized.trim();
+      }
+
+      function shouldAutoRemoveIssue(issue) {
+        if (!issue) return false;
+        var help = (issue.help || "").toLowerCase();
+        if (help.indexOf("자음만") >= 0) return true;
+        if (help.indexOf("자음을 단독으로") >= 0) return true;
+        if (help.indexOf("단어를 완성") >= 0 && !(issue.suggestion || "").trim()) {
+          return true;
+        }
+        return false;
+      }
+
+      function getSuggestionTextByKey(key) {
+        var el = document.getElementById(sugIds[key]);
+        return el ? (el.textContent || "") : "";
+      }
+
+      function hasCancelIntentInSuggestion() {
+        var combined = [
+          getSuggestionTextByKey("title"),
+          getSuggestionTextByKey("description"),
+          getSuggestionTextByKey("condition"),
+          getSuggestionTextByKey("identifier"),
+          getSuggestionTextByKey("rightButton"),
+        ]
+          .join(" ")
+          .toLowerCase();
+        var keywords = ["취소", "나가", "중단", "중지", "이탈"];
+        for (var i = 0; i < keywords.length; i++) {
+          if (combined.indexOf(keywords[i]) >= 0) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function enforceCancelDestructiveRule() {
+        var leftEl = document.getElementById(sugIds.leftButton);
+        var rightEl = document.getElementById(sugIds.rightButton);
+        if (!leftEl || !rightEl) {
+          if (cancelRuleHint) {
+            cancelRuleHint.textContent = "";
+            cancelRuleHint.style.display = "none";
+          }
+          return false;
+        }
+        var leftText = (leftEl.textContent || "").trim();
+        var shouldForce = leftText === "취소" && hasCancelIntentInSuggestion();
+        var changed = false;
+        if (shouldForce && rightEl.textContent.trim() !== "확인") {
+          rightEl.textContent = "확인";
+          changed = true;
+        }
+        if (!shouldForce) {
+          rightEl.removeAttribute("data-force-destructive");
+        } else {
+          rightEl.setAttribute("data-force-destructive", "true");
+        }
+        if (cancelRuleHint) {
+          if (shouldForce) {
+            cancelRuleHint.textContent =
+              "취소 작업 확인을 위해 오른쪽 버튼을 ‘확인’(Destructive)으로 설정했습니다.";
+            cancelRuleHint.style.display = "block";
+          } else {
+            cancelRuleHint.textContent = "";
+            cancelRuleHint.style.display = "none";
+          }
+        }
+        if (changed) {
+          updateDiffHighlights();
+        }
+        return shouldForce;
+      }
+
+      function autoCorrectTextWithIssues(originalText, issues) {
+        if (!originalText || !issues || !issues.length) {
+          return { text: originalText, changed: false };
+        }
+        var updated = originalText;
+        var changed = false;
+        issues.forEach(function (issue) {
+          var errorValue = typeof issue.error === "string" ? issue.error : "";
+          if (!errorValue && typeof issue.text === "string") {
+            errorValue = issue.text;
+          }
+          if (!errorValue) return;
+          var suggestion = pickPrimarySuggestionText(issue.suggestion || "");
+          var allowRemoval = shouldAutoRemoveIssue(issue);
+          if (!suggestion && !allowRemoval) return;
+          var target = errorValue;
+          var replaceValue = allowRemoval && !suggestion ? "" : suggestion;
+          var idx = -1;
+          var startHint = typeof issue.start === "number" ? issue.start : -1;
+          if (startHint >= 0 && startHint < updated.length) {
+            var searchStart = Math.max(0, startHint - 2);
+            idx = updated.indexOf(target, searchStart);
+          }
+          if (idx === -1) {
+            idx = updated.indexOf(target);
+          }
+          if (idx === -1 && target.trim() && target.trim() !== target) {
+            target = target.trim();
+            idx = updated.indexOf(target);
+          }
+          if (idx === -1) return;
+          updated =
+            updated.slice(0, idx) + replaceValue + updated.slice(idx + target.length);
+          changed = true;
+        });
+        return { text: updated, changed: changed };
+      }
+
+      function applySpellcheckCorrections(results) {
+        var correctedFields = [];
+        if (!results || !results.length) return false;
+        results.forEach(function (entry) {
+          var errors = entry.errors || [];
+          if (!errors.length) return;
+          var fieldKey = entry.field;
+          if (!fieldKey || !sugIds[fieldKey]) return;
+          var el = document.getElementById(sugIds[fieldKey]);
+          if (!el) return;
+          var current = el.textContent || "";
+          var correction = autoCorrectTextWithIssues(current, errors);
+          if (correction.changed && correction.text !== current) {
+            el.textContent = correction.text;
+            correctedFields.push(entry.label || fieldKey);
+          }
+        });
+        if (correctedFields.length) {
+          updateDiffHighlights();
+          spellcheckStatus.textContent =
+            "맞춤법을 자동으로 수정했습니다. (" + correctedFields.join(", ") + ")";
+          enforceCancelDestructiveRule();
+          return true;
+        }
+        enforceCancelDestructiveRule();
+        return false;
+      }
+
+      function resetLintFields() {
+        var keys = ["title", "identifier", "description", "condition", "leftButton", "rightButton"];
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          setField(srcIds[k], "");
+          setField(sugIds[k], "");
+        }
+        document.getElementById("lint-kind-pill").textContent = "-";
+        document.getElementById("lint-subtype-pill").textContent = "-";
+        statusText.textContent = "";
+        statusError.textContent = "";
+        latestScanSource = null;
+        latestDbSuggestion = null;
+        clearSpellcheckPending();
+        clearSpellcheckProgress();
+        stopProgressTicker("ai");
+        if (dbStatusText) dbStatusText.textContent = "";
+        if (dbStatusError) dbStatusError.textContent = "";
+        if (dbPromptInput) dbPromptInput.value = "";
+        if (spellcheckStatus) spellcheckStatus.textContent = "-";
+        if (spellcheckList) spellcheckList.innerHTML = "";
+        if (cancelRuleHint) {
+          cancelRuleHint.textContent = "";
+          cancelRuleHint.style.display = "none";
+        }
+        updateDiffHighlights();
+        enforceCancelDestructiveRule();
+      }
+
+      // ---------- 검사 버튼 / 초기화 / 적용하기 ----------
+
+      btnReset.addEventListener("click", function () {
+        resetLintFields();
+        parent.postMessage(
+          {
+            pluginMessage: { type: "RESET_REQUEST" },
+          },
+          "*"
+        );
+      });
+
+      btnCheck.addEventListener("click", function () {
+        statusText.textContent = "선택된 모달을 검사하는 중...";
+        statusError.textContent = "";
+        markSpellcheckPending("lint", true);
+        parent.postMessage(
+          {
+            pluginMessage: { type: "CHECK_SELECTION" },
+          },
+          "*"
+        );
+      });
+
+      btnApply.addEventListener("click", function () {
+        // 현재 제안 영역에서 텍스트 읽어서 plugin에 전달
+        var suggestion = {
+          title: document.getElementById(sugIds.title).textContent.trim(),
+          identifier: document
+            .getElementById(sugIds.identifier)
+            .textContent.trim(),
+          description: document
+            .getElementById(sugIds.description)
+            .textContent.trim(),
+          condition: document
+            .getElementById(sugIds.condition)
+            .textContent.trim(),
+          leftButton: document
+            .getElementById(sugIds.leftButton)
+            .textContent.trim(),
+          rightButton: document
+            .getElementById(sugIds.rightButton)
+            .textContent.trim(),
+        };
+        parent.postMessage(
+          {
+            pluginMessage: { type: "APPLY_SUGGESTIONS", suggestion: suggestion },
+          },
+          "*"
+        );
+      });
+
+      btnDbSuggest.addEventListener("click", function () {
+        var componentType = dbComponentSelect.value || latestComponentKind || "modal";
+        var prompt = (dbPromptInput && dbPromptInput.value) || "";
+        if (!prompt.trim()) {
+          dbStatusText.textContent = "";
+          dbStatusError.textContent = "상황 설명을 입력해 주세요.";
+          return;
+        }
+        dbStatusText.textContent = "DB 추천을 생성하는 중...";
+        dbStatusError.textContent = "";
+        var result = buildDbSuggestionFromPrompt(
+          prompt,
+          componentType,
+          latestScanSource
+        );
+        var suggestion = result.suggestion;
+        if (
+          result.resolvedType &&
+          result.resolvedType !== componentType &&
+          dbComponentSelect
+        ) {
+          dbComponentSelect.value = result.resolvedType;
+        }
+        latestComponentKind = result.resolvedType || componentType;
+        latestDbSuggestion = suggestion;
+        renderDbSuggestion(suggestion);
+        syncSuggestionFieldsFromDb(suggestion);
+        var typeLabel = result.resolvedType === "toast" ? "Toast" : "Modal";
+        dbStatusText.textContent = "DB 추천이 생성되었습니다. (" + typeLabel + ")";
+        requestSpellcheck("DB 추천");
+      });
+
+      btnDbApply.addEventListener("click", function () {
+        if (!latestDbSuggestion) {
+          dbStatusText.textContent = "";
+          dbStatusError.textContent = "먼저 DB 추천을 생성해 주세요.";
+          return;
+        }
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "APPLY_SUGGESTIONS",
+              suggestion: latestDbSuggestion,
+            },
+          },
+          "*"
+        );
+        dbStatusText.textContent = "DB 제안을 선택된 컴포넌트에 적용했습니다.";
+        dbStatusError.textContent = "";
+      });
+
+      // ---------- AI 탭 ----------
+
+      var aiPrompt = document.getElementById("ai-prompt");
+      var aiEls = {
+        title: document.getElementById("ai-title"),
+        identifier: document.getElementById("ai-identifier"),
+        description: document.getElementById("ai-description"),
+        condition: document.getElementById("ai-condition"),
+        leftButton: document.getElementById("ai-left-btn"),
+        rightButton: document.getElementById("ai-right-btn"),
+      };
+
+      var aiPreview = {
+        title: document.getElementById("ai-preview-title"),
+        identifier: document.getElementById("ai-preview-identifier"),
+        description: document.getElementById("ai-preview-description"),
+        condition: document.getElementById("ai-preview-condition"),
+        leftBtn: document.getElementById("ai-preview-left"),
+        rightBtn: document.getElementById("ai-preview-right"),
+      };
+
+      var dbEls = {
+        title: document.getElementById("db-title"),
+        identifier: document.getElementById("db-identifier"),
+        description: document.getElementById("db-description"),
+        condition: document.getElementById("db-condition"),
+        leftButton: document.getElementById("db-left-btn"),
+        rightButton: document.getElementById("db-right-btn"),
+      };
+
+      var dbPreview = {
+        modal: {
+          root: document.getElementById("db-preview-modal"),
+          title: document.getElementById("db-preview-title"),
+          identifier: document.getElementById("db-preview-identifier"),
+          description: document.getElementById("db-preview-description"),
+          condition: document.getElementById("db-preview-condition"),
+          leftBtn: document.getElementById("db-preview-left"),
+          rightBtn: document.getElementById("db-preview-right"),
+        },
+        toast: {
+          root: document.getElementById("db-preview-toast"),
+          title: document.getElementById("db-toast-title"),
+          body: document.getElementById("db-toast-body"),
+          action: document.getElementById("db-toast-action"),
+        },
+      };
+
+      function templateComponentType(template) {
+        var uiType = (template["UI Type"] || "").toLowerCase();
+        if (uiType.indexOf("toast") >= 0) {
+          return "toast";
+        }
+        return "modal";
+      }
+
+      function isDestructiveText(text) {
+        if (!text) return false;
+        var keywords = ["삭제", "제거", "파기", "탈퇴", "중단", "폐기", "취소", "해지"];
+        var lower = text.toLowerCase();
+        for (var i = 0; i < keywords.length; i++) {
+          if (lower.indexOf(keywords[i]) >= 0) return true;
+        }
+        return false;
+      }
+
+function normalizeToken(token) {
+  if (!token) return "";
+  var lower = token
+    .toLowerCase()
+    .replace(/["'“”‘’`~!@#$%^&*+=\\[\\]{}<>?,.\\-]/g, "")
+    .replace(/[0-9]+/g, "n");
+  var endings = [
+    "으로부터",
+    "으로써",
+    "으로",
+    "로",
+    "에게",
+    "에서",
+    "부터",
+    "까지",
+    "처럼",
+    "만큼",
+    "보다",
+    "조차",
+    "마저",
+    "만",
+    "이나",
+    "나",
+    "도",
+    "은",
+    "는",
+    "이",
+    "가",
+    "을",
+    "를",
+  ];
+  for (var i = 0; i < endings.length; i++) {
+    var ending = endings[i];
+    if (lower.length > ending.length && lower.endsWith(ending)) {
+      lower = lower.slice(0, -ending.length);
+      break;
     }
+  }
+  return lower;
+}
+
+function tokenizeText(text) {
+  if (!text) return [];
+  var raw = text.replace(/[\r\n]+/g, " ");
+  var tokens = raw
+    .split(/[\s,·/()]+/)
+    .map(normalizeToken)
+    .filter(function (token) {
+      return token.length > 0;
+    });
+  var unique = [];
+  tokens.forEach(function (token) {
+    if (unique.indexOf(token) === -1) {
+      unique.push(token);
+    }
+  });
+  return unique;
+}
+
+function getPromptKeywords(text) {
+  return tokenizeText(text);
+}
+
+function scoreTemplate(template, keywords) {
+  var score = 0;
+  var fields = [
+    "Depth1",
+    "Depth2",
+    "Depth3",
+    "사용자 행동",
+    "행동 패턴",
+    "Title",
+    "Category",
+    "Identifier",
+    "Description",
+    "Condition",
+    "Classification",
+    "사유",
+  ];
+  var fieldWeights = {
+    Condition: 6,
+    "사용자 행동": 4,
+    "행동 패턴": 3,
+    Title: 3,
+    Description: 2,
+    Category: 1,
+    Classification: 1.5,
+    사유: 1,
   };
-</script>
-</body>
+  var lowerMap = {};
+  var tokenMap = {};
+  fields.forEach(function (field) {
+    var value = template[field] || "";
+    lowerMap[field] = value.toLowerCase();
+    tokenMap[field] = tokenizeText(value);
+  });
+  var tokenMatches = 0;
+  keywords.forEach(function (keyword) {
+    if (!keyword) return;
+    fields.forEach(function (field) {
+      var weight = fieldWeights[field] || 1;
+      var tokens = tokenMap[field];
+      if (tokens.indexOf(keyword) >= 0) {
+        score += weight * 2;
+        tokenMatches++;
+      } else if (lowerMap[field] && lowerMap[field].indexOf(keyword) >= 0) {
+        score += weight * 0.5;
+      }
+    });
+  });
+  if (tokenMatches >= Math.max(1, keywords.length - 1)) {
+    score += 4;
+  }
+  var conditionTokens = tokenMap["Condition"] || [];
+  if (conditionTokens.length && keywords.length) {
+    var overlap = 0;
+    keywords.forEach(function (keyword) {
+      if (conditionTokens.indexOf(keyword) >= 0) overlap++;
+    });
+    if (overlap === keywords.length) {
+      score += 15;
+    } else if (overlap >= Math.max(1, Math.ceil(keywords.length / 2))) {
+      score += 8;
+    }
+  }
+  if (template.Title) score += 1;
+  if (template.Description) score += 1;
+  if (template.Condition) score += 0.5;
+  return score;
+}
+
+function findBestTemplate(promptText, componentType) {
+  var normalizedPrompt = (promptText || "").trim().toLowerCase();
+  var promptTokenString = getPromptKeywords(promptText).join(" ");
+  if (normalizedPrompt) {
+    for (var i = 0; i < DB_TEMPLATES.length; i++) {
+      var candidate = DB_TEMPLATES[i];
+    var condition = (candidate["Condition"] || "").toLowerCase();
+    var conditionTokenString = getPromptKeywords(candidate["Condition"] || "").join(" ");
+      if (
+        (condition && condition === normalizedPrompt) ||
+        (conditionTokenString && promptTokenString && conditionTokenString === promptTokenString)
+      ) {
+        return { template: candidate, score: 999 };
+      }
+    }
+  }
+  var keywords = getPromptKeywords(promptText);
+        var bestTemplate = null;
+        var bestScore = -Infinity;
+        DB_TEMPLATES.forEach(function (template) {
+          var tplType = templateComponentType(template);
+          if (componentType === "toast" && tplType !== "toast") return;
+          if (componentType === "modal" && tplType === "toast") return;
+          var score = scoreTemplate(template, keywords);
+          if (score > bestScore) {
+            bestScore = score;
+            bestTemplate = template;
+          }
+        });
+        return {
+          template: bestTemplate,
+          score: bestScore,
+        };
+      }
+
+      function applyTemplatePlaceholders(text, summary, numberFallback) {
+        if (!text) return "";
+        var keyword = summary || "작업";
+        var numberValue = numberFallback || "1";
+        return text
+          .replace(/\{\{항목\}\}|\{\{행동명\}\}|\{\{행동\}\}/g, keyword)
+          .replace(/\{\{n\}\}/g, numberValue);
+      }
+
+      function formatIdentifierText(raw) {
+        if (!raw) return "";
+        var replaced = raw.replace(/\{\{n\}\}/gi, "n").replace(/\d+/g, "n");
+        var lower = replaced.toLowerCase();
+        var idx = lower.indexOf("n행");
+        if (idx >= 0) {
+          var result = replaced.slice(idx).trim();
+          var commaIdx = result.indexOf(",");
+          if (commaIdx >= 0) {
+            result = result.slice(0, commaIdx);
+          }
+          return result.trim() || "n행";
+        }
+        return "n행";
+      }
+
+      function buildDbSuggestionFromPrompt(prompt, componentType, source) {
+        var summary = (prompt || "").trim();
+        if (!summary && source) {
+          summary = [source.title, source.description, source.condition]
+            .filter(function (v) {
+              return v && v.trim();
+            })
+            .join(" ");
+        }
+        if (!summary) {
+          summary = "작업 안내";
+        }
+        var numberMatch = summary.match(/\d+/);
+        var promptNumber = numberMatch ? numberMatch[0] : "1";
+        var prefer = findBestTemplate(summary, componentType);
+        var resolvedType = componentType;
+        var template = prefer.template;
+        var bestScore = prefer.score;
+        var oppositeType = componentType === "toast" ? "modal" : "toast";
+        var alt = findBestTemplate(summary, oppositeType);
+        if (
+          alt.template &&
+          (bestScore === -Infinity || alt.score > bestScore + 1)
+        ) {
+          resolvedType = oppositeType;
+          template = alt.template;
+          bestScore = alt.score;
+        }
+        var defaults = DB_DEFAULTS[resolvedType] || DB_DEFAULTS.modal;
+
+        function fill(fieldName, fallback) {
+          var value = template && template[fieldName] ? template[fieldName] : fallback;
+          if (!value || value === "-" || value === "—") {
+            value = "";
+          }
+          return applyTemplatePlaceholders(value, summary, promptNumber);
+        }
+
+        var suggestion = {
+          componentType: resolvedType,
+          title: fill("Title", defaults.title),
+          identifier:
+            resolvedType === "modal"
+              ? formatIdentifierText(fill("Identifier", defaults.identifier))
+              : "",
+          description: fill("Description", defaults.description),
+          condition: fill("Condition", defaults.condition),
+          leftButton: resolvedType === "modal" ? fill("Left button", defaults.leftButton) : "",
+          rightButton: fill("Right button", defaults.rightButton),
+        };
+
+        if (!suggestion.rightButton) {
+          suggestion.rightButton = defaults.rightButton;
+        }
+
+        return {
+          suggestion: suggestion,
+          resolvedType: resolvedType,
+        };
+      }
+
+      function renderDbSuggestion(sug) {
+        dbEls.title.textContent = sug.title || "";
+        dbEls.identifier.textContent = sug.identifier || "";
+        dbEls.description.textContent = sug.description || "";
+        dbEls.condition.textContent = sug.condition || "";
+        dbEls.leftButton.textContent = sug.leftButton || "";
+        dbEls.rightButton.textContent = sug.rightButton || "";
+        updateDbPreview(sug);
+      }
+
+      function updateDbPreview(sug) {
+        if (!sug) return;
+        if (sug.componentType === "toast") {
+          dbPreview.modal.root.style.display = "none";
+          dbPreview.toast.root.style.display = "flex";
+          dbPreview.toast.title.textContent = sug.title || "토스트 메시지";
+          dbPreview.toast.body.textContent =
+            sug.description || "조치가 완료됐습니다.";
+          dbPreview.toast.action.textContent = sug.rightButton || "확인";
+        } else {
+          dbPreview.modal.root.style.display = "flex";
+          dbPreview.toast.root.style.display = "none";
+          dbPreview.modal.title.textContent = sug.title || "";
+          dbPreview.modal.identifier.textContent = sug.identifier || "";
+          dbPreview.modal.identifier.style.display = sug.identifier ? "block" : "none";
+          dbPreview.modal.description.textContent = sug.description || "";
+          dbPreview.modal.condition.textContent = sug.condition || "";
+          dbPreview.modal.condition.style.display = sug.condition ? "block" : "none";
+          dbPreview.modal.leftBtn.textContent = sug.leftButton || "취소";
+          dbPreview.modal.leftBtn.style.display = sug.leftButton ? "inline-flex" : "none";
+          var rightText = sug.rightButton || "확인";
+          dbPreview.modal.rightBtn.textContent = rightText;
+          var destructive = isDestructiveText(rightText);
+          dbPreview.modal.rightBtn.classList.toggle("destructive", destructive);
+        }
+      }
+
+      function syncSuggestionFieldsFromDb(sug) {
+        if (!sug) return;
+        Object.keys(sugIds).forEach(function (key) {
+          if (typeof sug[key] === "undefined") return;
+          setField(sugIds[key], sug[key] || "");
+        });
+        updateDiffHighlights();
+        enforceCancelDestructiveRule();
+      }
+
+      function updateAiPreview(data) {
+        var title = (data.title || "").trim();
+        var desc = (data.description || "").trim();
+        var identifier = (data.identifier || "").trim();
+        var condition = (data.condition || "").trim();
+        var leftBtn = (data.leftButton || "").trim();
+        var rightBtn = (data.rightButton || "").trim();
+
+        aiPreview.title.textContent = title || "제목이 여기에 표시됩니다.";
+        aiPreview.description.textContent =
+          desc || "설명이 여기에 표시됩니다.";
+        aiPreview.identifier.textContent = identifier;
+        aiPreview.identifier.style.display = identifier ? "block" : "none";
+        aiPreview.condition.textContent = condition;
+        aiPreview.condition.style.display = condition ? "block" : "none";
+
+        aiPreview.leftBtn.textContent = leftBtn || "취소";
+        aiPreview.rightBtn.textContent = rightBtn || "확인";
+      }
+
+      btnAiSuggest.addEventListener("click", function () {
+        var prompt = aiPrompt.value || "";
+        if (!prompt.trim()) {
+          statusText.textContent = "";
+          statusError.textContent = "상황 설명을 입력해 주세요.";
+          return;
+        }
+        markSpellcheckPending("ai", true);
+        startProgressTicker("ai", AI_PROGRESS_ESTIMATE, function (percent, etaSeconds) {
+          var etaText = etaSeconds <= 0 ? "곧 완료" : "약 " + etaSeconds + "초 남음";
+          statusText.textContent =
+            "AI에 텍스트 추천을 요청하는 중... " + percent + "% (" + etaText + ")";
+        });
+        statusError.textContent = "";
+        parent.postMessage(
+          {
+            pluginMessage: { type: "AI_SUGGEST", prompt: prompt },
+          },
+          "*"
+        );
+      });
+
+      // ---------- plugin → UI 메시지 수신 ----------
+
+      window.onmessage = function (event) {
+        var msg = event.data.pluginMessage;
+        if (!msg || !msg.type) return;
+
+        if (msg.type === "CHECK_RESULT") {
+          var payload = msg.payload || {};
+          if (!payload.ok) {
+            statusText.textContent = "";
+            if (payload.reason === "selection") {
+              statusError.textContent = "하나의 모달만 선택해 주세요.";
+            } else {
+              statusError.textContent = "검사 중 오류가 발생했습니다.";
+            }
+            markSpellcheckPending("lint", false);
+            return;
+          }
+
+          statusText.textContent = "검사가 완료되었습니다.";
+          statusError.textContent = "";
+
+          var src = payload.source || {};
+          latestScanSource = src;
+          latestComponentKind = payload.kind || "modal";
+          latestDbSuggestion = null;
+          if (dbComponentSelect) {
+            dbComponentSelect.value =
+              latestComponentKind === "toast" ? "toast" : "modal";
+          }
+          setField(srcIds.title, src.title || "");
+          setField(srcIds.identifier, src.identifier || "", {
+            disabled: !src.hasIdentifier,
+          });
+          setField(srcIds.description, src.description || "");
+          setField(srcIds.condition, src.condition || "", {
+            disabled: !src.hasCondition,
+          });
+          setField(srcIds.leftButton, src.leftButton || "");
+          setField(srcIds.rightButton, src.rightButton || "");
+
+          // 우선 기본 제안은 현재 값 그대로 복사
+          setField(sugIds.title, src.title || "");
+          setField(sugIds.identifier, src.identifier || "");
+          setField(sugIds.description, src.description || "");
+          setField(sugIds.condition, src.condition || "");
+          setField(sugIds.leftButton, src.leftButton || "");
+          setField(sugIds.rightButton, src.rightButton || "");
+          updateDiffHighlights();
+          enforceCancelDestructiveRule();
+
+          // pill
+          var kindPill = document.getElementById("lint-kind-pill");
+          var subtypePill = document.getElementById("lint-subtype-pill");
+          kindPill.textContent =
+            payload.kind === "toast" ? "Toast" : "Modal";
+          if (payload.kind === "toast") {
+            subtypePill.textContent =
+              payload.subtype === "success" ? "Toast · Success" : "Toast · Caution";
+          } else {
+            subtypePill.textContent =
+              payload.subtype === "destructive" ? "Destructive" : "Normal";
+          }
+
+          if (payload.componentSupported === false) {
+            statusError.textContent =
+              "현재는 Modal/Toast 컴포넌트만 지원합니다. 선택한 레이어를 확인해 주세요.";
+          }
+          runSpellcheckIfPending("lint", "검사");
+        }
+
+        if (msg.type === "AI_SUGGEST_RESULT") {
+          var res = msg.payload || {};
+          stopProgressTicker("ai");
+          if (!res.ok) {
+            statusText.textContent = "";
+            statusError.textContent = res.error || "AI 호출에 실패했습니다.";
+            markSpellcheckPending("ai", false);
+            return;
+          }
+          var notice =
+            res.notice ||
+            (res.fallback
+              ? "AI 서버 연결이 불안정해 로컬 추천을 표시했습니다."
+              : "AI 텍스트 추천이 완료되었습니다.");
+          statusText.textContent = notice;
+          statusError.textContent = "";
+          var s = res.suggestion || {};
+          aiEls.title.textContent = s.title || "";
+          aiEls.identifier.textContent = s.identifier || "";
+          aiEls.description.textContent = s.description || "";
+          aiEls.condition.textContent = s.condition || "";
+          aiEls.leftButton.textContent = s.leftButton || "";
+          aiEls.rightButton.textContent = s.rightButton || "";
+          updateAiPreview(s);
+          runSpellcheckIfPending("ai", "AI 추천");
+        }
+
+        if (msg.type === "SPELLCHECK_PROGRESS") {
+          if (!spellcheckProgressMeta) return;
+          var progress = msg.payload || {};
+          if (typeof progress.total === "number" && progress.total > 0) {
+            spellcheckProgressMeta.totalTargets = progress.total;
+          }
+          spellcheckProgressMeta.completedTargets = progress.completed || 0;
+          updateSpellcheckProgressStatus();
+        }
+
+        if (msg.type === "SPELLCHECK_RESULT") {
+          var payload = msg.payload || {};
+          if (payload.error) {
+            clearSpellcheckProgress();
+            spellcheckStatus.textContent = payload.error;
+            if (spellcheckList) {
+              spellcheckList.innerHTML = "";
+              var errorItem = document.createElement("div");
+              errorItem.className = "spellcheck-item error";
+              errorItem.textContent = payload.error;
+              spellcheckList.appendChild(errorItem);
+            }
+            return;
+          }
+          clearSpellcheckProgress();
+          var spellResults = payload.results || [];
+          renderSpellcheckResult(spellResults);
+          var corrected = applySpellcheckCorrections(spellResults);
+          if (!corrected && payload.message) {
+            spellcheckStatus.textContent = payload.message;
+          }
+        }
+      };
+
+      // 초기 상태
+      resetLintFields();
+      statusText.textContent = "";
+      statusError.textContent = "";
+    </script>
+  </body>
 </html>

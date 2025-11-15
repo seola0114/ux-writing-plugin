@@ -1,16 +1,26 @@
 {
   "name": "UX Writing Lint – Modal/Toast Helper",
-  "id": "ux-writing-lint",
+  "id": "ux-writing-modal-helper",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
-  "editorType": ["figma", "dev"],
-  "permissions": ["currentuser"],
+  "editorType": [
+    "figma",
+    "figjam",
+    "dev"
+  ],
   "networkAccess": {
+    "reasoning": "Spellcheck uses a hosted API plus optional localhost proxy for development.",
     "allowedDomains": [
-      "https://late-rain-59eb.seola-kim.workers.dev",
+      "https://static.figma.com",
       "https://script.google.com",
-      "https://script.googleusercontent.com"
+      "https://late-rain-59eb.seola-kim.workers.dev",
+      "https://script.googleusercontent.com",
+      "https://speller.cs.pusan.ac.kr",
+      "https://speller.town"
+    ],
+    "devAllowedDomains": [
+      "http://localhost:3000"
     ]
   }
 }
